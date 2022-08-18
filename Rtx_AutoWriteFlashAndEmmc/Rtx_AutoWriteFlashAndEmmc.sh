@@ -242,7 +242,7 @@ func_dtb()
 func_ramdisk()
 {
 	HEX_ADDR_START=0x18800
-	FILE_PATH=`./uramdisk-recovery-SVM.img`
+	FILE_PATH=`ls ./uramdisk-recovery-SVM.img`
 	Load_FlashWriter
 	ChangeSUP
 	Load_File_To_Emmc $HEX_ADDR_START $FILE_PATH
