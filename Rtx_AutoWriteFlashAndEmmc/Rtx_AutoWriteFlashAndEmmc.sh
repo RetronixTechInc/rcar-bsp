@@ -233,7 +233,7 @@ func_uImage()
 func_dtb()
 {
 	HEX_ADDR_START=0x6400
-	FILE_PATH=`./*.dtb`
+	FILE_PATH=`ls ./*.dtb`
 	Load_FlashWriter
 	ChangeSUP
 	Load_File_To_Emmc $HEX_ADDR_START $FILE_PATH
