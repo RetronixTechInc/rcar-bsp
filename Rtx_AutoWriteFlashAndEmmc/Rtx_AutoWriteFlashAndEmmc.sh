@@ -3,8 +3,9 @@
 #2022/8/03 When execute script, need to open picocom.
 #2022/8/05 When execute script, don't need to open picocom..
 #2022/8/12 Add only write u-boot function.
+#2022/8/26 Add write u-boot-env function.
 
-#Jerry_08/012
+#Jerry_08/26
 
 TTY_NODE="/dev/ttyUSB0"
 
@@ -22,7 +23,8 @@ FLASH_FILE_2=`ls ${DATAPATH}/dummy_fw.srec`
 FLASH_FILE_3=`ls ${DATAPATH}/cert_header_sa6.srec`
 FLASH_FILE_4=`ls ${DATAPATH}/dummy_rtos.srec`
 FLASH_FILE_5=`ls ${DATAPATH}/bl31*.srec`
-FLASH_FILE_6=`ls ${DATAPATH}/u-boot-elf-condor.srec`
+FLASH_FILE_UBOOT=`ls ${DATAPATH}/u-boot-elf-condor.srec`
+FLASH_FILE_UBOOT_ENV=`ls ${DATAPATH}/rtx-uboot-env*.bin`
 
 FLASH_PARTITION_0="EB200000:000000:${FLASH_FILE_0}"
 FLASH_PARTITION_1="EB2D8000:040000:${FLASH_FILE_1}"
@@ -30,7 +32,8 @@ FLASH_PARTITION_2="EB2B4000:0C0000:${FLASH_FILE_2}"
 FLASH_PARTITION_3="EB200000:180000:${FLASH_FILE_3}"
 FLASH_PARTITION_4="EB200000:1C0000:${FLASH_FILE_4}"
 FLASH_PARTITION_5="46400000:2C0000:${FLASH_FILE_5}"
-FLASH_PARTITION_6="50000000:840000:${FLASH_FILE_6}"
+FLASH_PARTITION_UBOOT="50000000:840000:${FLASH_FILE_UBOOT}"
+FLASH_PARTITION_UBOOT_ENV="700000:40000:${FLASH_FILE_UBOOT_ENV}"
 
 FLASH_PARTITION="FLASH_PARTITION_0 FLASH_PARTITION_1 FLASH_PARTITION_2 FLASH_PARTITION_3 FLASH_PARTITION_4 FLASH_PARTITION_5"
 
@@ -85,9 +88,9 @@ Flash_Writer_All()
 		sleep "$INTERVAL_SLEEP"
 		echo -ne "3\r" > /dev/ttyUSB0
 		sleep "$INTERVAL_SLEEP"
-		echo -ne "y\r" > /dev/ttyUSB0
+		echo -ne "y" > /dev/ttyUSB0
 		sleep "$INTERVAL_SLEEP"
-		echo -ne "y\r" > /dev/ttyUSB0
+		echo -ne "y" > /dev/ttyUSB0
 		sleep "$INTERVAL_SLEEP"
 		echo -ne "${ARG_TOP_ADDR}\r" > /dev/ttyUSB0
 		sleep "$INTERVAL_SLEEP"
@@ -96,7 +99,7 @@ Flash_Writer_All()
 		sudo dd if="${ARG_FILE_NAME}" of="${TTY_NODE}"
 		sync
 		sleep "$INTERVAL_SLEEP"
-		echo -ne "y\r" > /dev/ttyUSB0
+		echo -ne "y" > /dev/ttyUSB0
 		sleep 3
 		
 		
@@ -105,8 +108,10 @@ Flash_Writer_All()
 
 Flash_Writer_uboot()
 {
+	PARTITION_INFO_TMP=FLASH_PARTITION_UBOOT
 	#echo "FLASH_PARTITION_6 = ${FLASH_PARTITION_6}"
-	eval PARTITION_INFO=\$${FLASH_PARTITION_6}
+	eval PARTITION_INFO=\$${PARTITION_INFO_TMP}
+#	eval PARTITION_INFO=\$${FLASH_PARTITION_6}
 	#echo "PARTITION_INFO = ${PARTITION_INFO}"
 
 	if [ "${PARTITION_INFO}" == "" ]
@@ -126,18 +131,58 @@ Flash_Writer_uboot()
 	sleep "$INTERVAL_SLEEP"
 	echo -ne "3\r" > /dev/ttyUSB0
 	sleep "$INTERVAL_SLEEP"
-	echo -ne "y\r" > /dev/ttyUSB0
+	echo -ne "y" > /dev/ttyUSB0
 	sleep "$INTERVAL_SLEEP"
-	echo -ne "y\r" > /dev/ttyUSB0
+	echo -ne "y" > /dev/ttyUSB0
 	sleep "$INTERVAL_SLEEP"
 	echo -ne "${ARG_TOP_ADDR}\r" > /dev/ttyUSB0
 	sleep "$INTERVAL_SLEEP"
 	echo -ne "${ARG_SAVE_ADDR}\r" > /dev/ttyUSB0
 	sleep "$INTERVAL_SLEEP"
+	echo "dd if=${ARG_FILE_NAME} of=${TTY_NODE}"
 	sudo dd if="${ARG_FILE_NAME}" of="${TTY_NODE}"
 	sync
 	sleep "$INTERVAL_SLEEP"
-	echo -ne "y\r" > /dev/ttyUSB0
+	echo -ne "y" > /dev/ttyUSB0
+	sleep 3
+}
+
+Flash_Writer_uboot_env()
+{
+	PARTITION_INFO_TMP=FLASH_PARTITION_UBOOT_ENV
+
+	eval PARTITION_INFO=\$${PARTITION_INFO_TMP}
+
+	if [ "${PARTITION_INFO}" == "" ]
+	then
+		continue ;
+	fi
+
+	ARG_ADDR=`echo ${PARTITION_INFO} | awk -F':' '{print $1}'`
+	ARG_SIZE=`echo ${PARTITION_INFO} | awk -F':' '{print $2}'`
+	ARG_FILE_NAME=`echo ${PARTITION_INFO} | awk -F':' '{print $3}'`
+	
+	echo "ARG_ADDR = ${ARG_ADDR}"
+	echo "ARG_SIZE = ${ARG_SIZE}"
+	echo "ARG_FILE_NAME = ${ARG_FILE_NAME}"
+	
+	echo -ne "xls3\r" > /dev/ttyUSB0
+	sleep "$INTERVAL_SLEEP"
+	echo -ne "3\r" > /dev/ttyUSB0
+	sleep "$INTERVAL_SLEEP"
+	echo -ne "y" > /dev/ttyUSB0
+	sleep "$INTERVAL_SLEEP"
+	echo -ne "y" > /dev/ttyUSB0
+	sleep "$INTERVAL_SLEEP"
+	echo -ne "${ARG_SIZE}\r" > /dev/ttyUSB0
+	sleep "$INTERVAL_SLEEP"
+	echo -ne "${ARG_ADDR}\r" > /dev/ttyUSB0
+	sleep "$INTERVAL_SLEEP"
+	echo "dd if=${ARG_FILE_NAME} of=${TTY_NODE}"
+	sudo dd if="${ARG_FILE_NAME}" of="${TTY_NODE}"
+	sync
+	sleep "$INTERVAL_SLEEP"
+	echo -ne "y" > /dev/ttyUSB0
 	sleep 3
 }
 
@@ -212,6 +257,8 @@ func_flash()
 	Load_FlashWriter
 	ChangeSUP
 	Flash_Writer_All
+	Flash_Writer_uboot
+	Flash_Writer_uboot_env
 }
 
 func_uboot()
@@ -219,6 +266,12 @@ func_uboot()
 	Load_FlashWriter
 	ChangeSUP
 	Flash_Writer_uboot
+}
+
+func_uboot_env()
+{
+	Load_FlashWriter
+	Flash_Writer_uboot_env
 }
 
 func_uImage()
@@ -254,6 +307,7 @@ func_all()
 	ChangeSUP
 	Flash_Writer_All
 	Flash_Writer_uboot
+	Flash_Writer_uboot_env
 	
 	HEX_ADDR_START=0x6800
 	FILE_PATH=`ls ./Image*`
@@ -279,10 +333,12 @@ case "${1}" in
 		;;
 	"flash")
 		func_flash
-		func_uboot
 		;;
 	"uboot")
 		func_uboot
+		;;
+	"uboot-env")
+		func_uboot_env
 		;;
 	"uImage")
 		func_uImage
@@ -294,7 +350,7 @@ case "${1}" in
 		func_ramdisk
 		;;
 	*) 
-		echo "${0} [all/flash/uboot/dtb/uImage/ramdisk]"
+		echo "${0} [all/flash/uboot/uboot-env/dtb/uImage/ramdisk]"
 		exit 1
 		;;
 esac
