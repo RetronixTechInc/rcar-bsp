@@ -309,6 +309,27 @@ func_all()
 	Flash_Writer_uboot
 	Flash_Writer_uboot_env
 	
+	#HEX_ADDR_START=0x6800
+	#FILE_PATH=`ls ./Image*`
+	#Load_File_To_Emmc $HEX_ADDR_START $FILE_PATH
+	
+	#HEX_ADDR_START=0x6400
+	#FILE_PATH=`ls ./*.dtb`
+	#Load_File_To_Emmc $HEX_ADDR_START $FILE_PATH
+	
+	HEX_ADDR_START=0x18800
+	FILE_PATH=`ls ./uramdisk-recovery-SVM.img`
+	Load_File_To_Emmc $HEX_ADDR_START $FILE_PATH
+}
+
+func_all_and_kernel()
+{
+	Load_FlashWriter
+	ChangeSUP
+	Flash_Writer_All
+	Flash_Writer_uboot
+	Flash_Writer_uboot_env
+	
 	HEX_ADDR_START=0x6800
 	FILE_PATH=`ls ./Image*`
 	Load_File_To_Emmc $HEX_ADDR_START $FILE_PATH
@@ -331,6 +352,9 @@ case "${1}" in
 	"all")
 		func_all
 		;;
+	"func_all_and_kernel")
+		func_all_and_kernel
+		;;
 	"flash")
 		func_flash
 		;;
@@ -350,7 +374,7 @@ case "${1}" in
 		func_ramdisk
 		;;
 	*) 
-		echo "${0} [all/flash/uboot/uboot-env/dtb/uImage/ramdisk]"
+		echo "${0} [all/flash/uboot/uboot-env/dtb/uImage/ramdisk/func_all_and_kernel]"
 		exit 1
 		;;
 esac
