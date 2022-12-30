@@ -3,9 +3,6 @@
 
 ## Quick Start
 
-
-### Step
-
 1. Download 22R000-SB rootfs file. please use the following link:  
    [https://pse.is/4pfn6a](https://pse.is/4pfn6a)
 
@@ -20,3 +17,12 @@
 
 1. Please follow this instruction to flash eMMC.  
   `2022-Rtx-VEMS-SB-StartUpGuideWithEmmc.pdf`
+
+
+##
+## How to use camera ov10635?
+
+1. Copy ./Rtx_Tools/rtx_camera_display.sh to device.
+
+1. Execute this script to display the ov10635 camera.  
+   `Ex : ./rtx_camera_display.sh N (N is 0~7)`
