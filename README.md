@@ -26,3 +26,13 @@
 
 1. Execute this script to display the ov10635 camera.  
    `Ex : ./rtx_camera_display.sh N (N is 0~7)`
+
+
+##
+## How to build Retronix kernel and Retronix u-boot in yocto project?
+
+1. Copy ./Rtx_Recipes/linux-renesas_5.4.bbappend to <Your Yocto Project>/meta-renesas/meta-rcar-bsp/recipes-kernel/linux/
+
+1. Copy ./Rtx_Recipes/u-boot_2020.01.bbappend to <Your Yocto Project>/meta-renesas/meta-rcar-bsp/recipes-bsp/u-boot/
+
+Complete the above steps, when you build yocto project, your kernel and u-boot will be downloaded from git server of Retronix.
