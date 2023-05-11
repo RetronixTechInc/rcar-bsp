@@ -1,0 +1,45 @@
+From 5242742dc0a513b7a05c3b64085ee4926ba608ee Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Zhiyin=20Luo=20=28=E7=BD=97=E6=A4=8D=E5=B0=B9=29?=
+ <zhiyin.luo@mediatek.com>
+Date: Wed, 15 Jan 2020 15:33:22 +0800
+Subject: [PATCH 09/12] Fix frame info statistics error in HWUI
+
+Frames with duration less than but near 150ms are wrongly counted in the
+first mSlowFrameCounts bucket.
+We should accumulate these frames in the last mFrameCounts bucket.
+
+Bug: 147777370
+Change-Id: I896454669659b3d95cc30fab5e8092eb75c34f18
+Test: run cts -m CtsIncidentHostTestCases -t
+   com.android.server.cts.GraphicsStatsValidationTest#testDaveyDrawFrame
+Signed-off-by: Denys Stakhnik <denys.stakhnik@globallogic.com>
+Jira-ID: ADM-4225
+---
+ libs/hwui/ProfileData.cpp | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/libs/hwui/ProfileData.cpp b/libs/hwui/ProfileData.cpp
+index 70ca4e3e807..4cee4bda515 100644
+--- a/libs/hwui/ProfileData.cpp
++++ b/libs/hwui/ProfileData.cpp
+@@ -149,10 +149,15 @@ void ProfileData::reset() {
+ void ProfileData::reportFrame(int64_t duration) {
+     mTotalFrameCount++;
+     uint32_t framebucket = frameCountIndexForFrameTime(duration);
+-    if (framebucket <= mFrameCounts.size()) {
++    if (framebucket < mFrameCounts.size()) {
+         mFrameCounts[framebucket]++;
+     } else {
+-        framebucket = (ns2ms(duration) - kSlowFrameBucketStartMs) / kSlowFrameBucketIntervalMs;
++        duration = ns2ms(duration);
++        if (duration < kSlowFrameBucketStartMs) {
++            mFrameCounts[mFrameCounts.size() - 1]++;
++            return;
++        }
++        framebucket = (duration - kSlowFrameBucketStartMs) / kSlowFrameBucketIntervalMs;
+         framebucket = std::min(framebucket, static_cast<uint32_t>(mSlowFrameCounts.size() - 1));
+         mSlowFrameCounts[framebucket]++;
+     }
+-- 
+2.28.0
+

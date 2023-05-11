@@ -1,0 +1,53 @@
+From a2ebf6acb2639651b446c8a2ba6dd888c9127f87 Mon Sep 17 00:00:00 2001
+From: Roman Hakh <roman.hakh@globallogic.com>
+Date: Sun, 2 Aug 2020 18:28:30 +0300
+Subject: [PATCH 12/12] GNSS: Add a check of SIM presence to GnssConfiguration
+
+There are functions in the  GnssConfiguration class that load and apply
+GNSS properties from a carrier configuration file. But these properties
+are related to SUPL and LPP that are used in cell phones.
+Therefore, need to check the presence of SIM in device before
+applying the configuration.
+
+Test: $ adb logcat | grep 'Unable to set ES_EXTENSION_SEC: 0'
+      to make sure that properties weren't applied.
+
+Jira-Id: ADM-4909
+
+Signed-off-by: Roman Hakh <roman.hakh@globallogic.com>
+Change-Id: I8bffd23fe7785c85f8342eb525ad454b570f439d
+---
+ .../com/android/server/location/GnssConfiguration.java | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/services/core/java/com/android/server/location/GnssConfiguration.java b/services/core/java/com/android/server/location/GnssConfiguration.java
+index 18d9f69c973..b7a51ed94f9 100644
+--- a/services/core/java/com/android/server/location/GnssConfiguration.java
++++ b/services/core/java/com/android/server/location/GnssConfiguration.java
+@@ -21,6 +21,7 @@ import android.os.PersistableBundle;
+ import android.os.SystemProperties;
+ import android.telephony.CarrierConfigManager;
+ import android.telephony.SubscriptionManager;
++import android.telephony.TelephonyManager;
+ import android.text.TextUtils;
+ import android.util.Log;
+ import android.util.StatsLog;
+@@ -236,7 +237,14 @@ class GnssConfiguration {
+         logConfigurations();
+ 
+         final HalInterfaceVersion gnssConfigurationIfaceVersion = getHalInterfaceVersion();
+-        if (gnssConfigurationIfaceVersion != null) {
++
++        TelephonyManager phone = (TelephonyManager)
++                                    mContext.getSystemService(Context.TELEPHONY_SERVICE);
++        int ddSubId = SubscriptionManager.getDefaultDataSubscriptionId();
++        String simOperator = SubscriptionManager.isValidSubscriptionId(ddSubId)
++                                ? phone.getSimOperator(ddSubId) : phone.getSimOperator();
++
++        if (gnssConfigurationIfaceVersion != null && !TextUtils.isEmpty(simOperator)) {
+             // Set to a range checked value.
+             if (isConfigEsExtensionSecSupported(gnssConfigurationIfaceVersion)
+                     && !native_set_es_extension_sec(mEsExtensionSec)) {
+-- 
+2.28.0
+

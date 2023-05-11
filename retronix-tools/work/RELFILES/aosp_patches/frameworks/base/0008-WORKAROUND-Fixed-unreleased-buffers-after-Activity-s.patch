@@ -1,0 +1,35 @@
+From 0da155f99d3bd345821a0ecd591186c3e662573d Mon Sep 17 00:00:00 2001
+From: Ivan Pustovit <ivan.pustovit@globallogic.com>
+Date: Tue, 26 May 2020 21:42:04 +0300
+Subject: [PATCH 08/12] [WORKAROUND]Fixed unreleased buffers after Activity
+ switch
+
+This patch fixes memory leak after Activity switch.
+Buffers allocated for background layer remain not destroyed
+after activity switch.
+
+Use of setLayer instead of setRelativeLayer fixed this problem.
+
+Jira-Id: ADM-4570
+Signed-off-by: Ivan Pustovit <ivan.pustovit@globallogic.com>
+Change-Id: I1c83109a31648ea07208b01ba5b791e8de792dac
+---
+ core/java/android/view/SurfaceView.java | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/core/java/android/view/SurfaceView.java b/core/java/android/view/SurfaceView.java
+index 765b758bdc5..182b4e11282 100644
+--- a/core/java/android/view/SurfaceView.java
++++ b/core/java/android/view/SurfaceView.java
+@@ -651,7 +651,7 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
+         }
+         if ((mSubLayer < 0) && ((mSurfaceFlags & SurfaceControl.OPAQUE) != 0)) {
+             mBackgroundControl.show();
+-            mBackgroundControl.setRelativeLayer(viewRoot, Integer.MIN_VALUE);
++            mBackgroundControl.setLayer(Integer.MIN_VALUE);
+         } else {
+             mBackgroundControl.hide();
+         }
+-- 
+2.28.0
+

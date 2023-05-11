@@ -1,0 +1,52 @@
+From d705dc315a8b315e28afdfa5458d7a0b4175c685 Mon Sep 17 00:00:00 2001
+From: Sergii Piatakov <sergii.piatakov@globallogic.com>
+Date: Mon, 10 Feb 2020 12:22:33 +0200
+Subject: [PATCH 03/12] CarSystemUI: handle exception to prevent crash loop
+
+In some cases `CarUserManagerHelper` may throw an exception inside
+`getInitialUser`. For example, the exception may be raised if only
+one user exists.
+As a result the `com.android.systemui` stucks in the crash loop and
+makes the system not-operable and in the `user` mode leads to fallback
+to the recovery mode.
+
+The correctness of the mentioned below test is questionable, but a
+client code should be ready for any (include invalid) input data or
+events.
+
+For more details see:
+ - $ANDROID_BUILD_TOP/packages/service/Car/user/car-user-lib/src/\
+       android/car/userlib/CarUserManagerHelper.java
+
+Test: run cts-dev -m CtsDevicePolicyManagerTestCases \
+                  -t com.android.cts.devicepolicy.DeviceOwnerTest#\
+                     testSecurityLoggingWithSingleUser
+Jira-Id: ADM-4486
+Change-Id: I78f48dedfbabe56a9132963b2734bc585533f9f4
+Signed-off-by: Sergii Piatakov <sergii.piatakov@globallogic.com>
+---
+ .../systemui/statusbar/car/FullscreenUserSwitcher.java    | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/packages/CarSystemUI/src/com/android/systemui/statusbar/car/FullscreenUserSwitcher.java b/packages/CarSystemUI/src/com/android/systemui/statusbar/car/FullscreenUserSwitcher.java
+index 92834e8cd08..12a4e84492e 100644
+--- a/packages/CarSystemUI/src/com/android/systemui/statusbar/car/FullscreenUserSwitcher.java
++++ b/packages/CarSystemUI/src/com/android/systemui/statusbar/car/FullscreenUserSwitcher.java
+@@ -111,7 +111,13 @@ public class FullscreenUserSwitcher {
+     }
+ 
+     private void showDialogForInitialUser() {
+-        int initialUser = mCarUserManagerHelper.getInitialUser();
++        int initialUser = UserHandle.USER_SYSTEM;
++        try {
++            initialUser = mCarUserManagerHelper.getInitialUser();
++        } catch (Exception e) {
++            dismissUserSwitcher();
++            return;
++        }
+         UserInfo initialUserInfo = mUserManager.getUserInfo(initialUser);
+         mSelectedUser = new UserRecord(initialUserInfo,
+                 /* isStartGuestSession= */ false,
+-- 
+2.28.0
+

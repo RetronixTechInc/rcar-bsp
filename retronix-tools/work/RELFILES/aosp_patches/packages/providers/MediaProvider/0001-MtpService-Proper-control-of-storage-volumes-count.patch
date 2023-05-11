@@ -1,0 +1,43 @@
+From dba23980bbb9a5ccc5923dd10967cc9b50c2bbb1 Mon Sep 17 00:00:00 2001
+From: Anastasiia Lukianenko <a.lukianenko@globallogic.com>
+Date: Thu, 24 Oct 2019 14:02:48 +0300
+Subject: [PATCH] MtpService: Proper control of storage volumes count
+
+mVolumes variable updates it's value only in onCreate() function, but in
+case of SD card inserting in MTP data transfer mode SD card volume won't be
+available because in onStorageStateChanged() function storage array
+(mVolumes) has non-relevant value (old count of volumes).
+
+Test:
+    1. Enable MTP
+    2. Insert flash drive (USB or SD card)
+    3. Observe available partitions on DUT through MTP on PC
+    4. Check that internal storage and flash drive are available
+
+Patch approved by Google and will be implemented in future Android10
+release:
+https://android-review.googlesource.com/c/platform/packages/providers/MediaProvider/+/1125277
+
+Jira-ID: ADM-3913
+Signed-off-by: a.lukianenko <a.lukianenko@globallogic.com>
+Change-Id: I1b93eb611ff7e1b20add9983146a8b9a7962eb54
+---
+ src/com/android/providers/media/MtpService.java | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/com/android/providers/media/MtpService.java b/src/com/android/providers/media/MtpService.java
+index ee933a7a..0b9c0e01 100644
+--- a/src/com/android/providers/media/MtpService.java
++++ b/src/com/android/providers/media/MtpService.java
+@@ -65,6 +65,8 @@ public class MtpService extends Service {
+             synchronized (MtpService.this) {
+                 Log.d(TAG, "onStorageStateChanged " + path + " " + oldState + " -> " + newState);
+                 if (Environment.MEDIA_MOUNTED.equals(newState)) {
++                    // Updating mVolumes variable because new storage could be inserted
++                    mVolumes = StorageManager.getVolumeList(getUserId(), 0);
+                     for (int i = 0; i < mVolumes.length; i++) {
+                         StorageVolume volume = mVolumes[i];
+                         if (volume.getPath().equals(path)) {
+-- 
+2.28.0
+

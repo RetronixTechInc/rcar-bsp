@@ -1,0 +1,32 @@
+From f9b86f0d3ed9880a73555abf8b48261f3e57e2e1 Mon Sep 17 00:00:00 2001
+From: Oleksii Gulchenko <oleksii.gulchenko@globallogic.com>
+Date: Tue, 21 May 2019 16:57:05 +0300
+Subject: [PATCH] W/A: Not forbidden executables is allowed by default
+
+This workaround created for applications which not listed in
+list of forbidden apps.
+
+Signed-off-by: Oleksii Gulchenko <oleksii.gulchenko@globallogic.com>
+(cherry picked from commit fe62ac7477070cb103df21f17547c88bbc809224)
+(cherry picked from commit e147487d640f01ef36cb73c0aeb8b632b44f6587)
+Change-Id: Ib7bef1d50a32a6ff9a07efa174a1e58cb8bf2d75
+---
+ ui/build/paths/config.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ui/build/paths/config.go b/ui/build/paths/config.go
+index f4bb89fbb..b37da6576 100644
+--- a/ui/build/paths/config.go
++++ b/ui/build/paths/config.go
+@@ -56,7 +56,7 @@ var Log = PathConfig{
+ var Missing = PathConfig{
+ 	Symlink: true,
+ 	Log:     true,
+-	Error:   true,
++	Error:   false,
+ }
+ 
+ var LinuxOnlyPrebuilt = PathConfig{
+-- 
+2.28.0
+

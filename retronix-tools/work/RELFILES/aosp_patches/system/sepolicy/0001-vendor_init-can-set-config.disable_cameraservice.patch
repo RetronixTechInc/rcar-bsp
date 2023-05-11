@@ -1,0 +1,201 @@
+From 35dcb344aa7e7fa43dfc290987db63393b5239cd Mon Sep 17 00:00:00 2001
+From: Oleh Cherpak <oleh.cherpak@globallogic.com>
+Date: Fri, 13 Mar 2020 13:14:02 +0200
+Subject: [PATCH] vendor_init can set config.disable_cameraservice
+
+Cherry-picked from AOSP/master:
+https://android-review.googlesource.com/c/platform/system/sepolicy/+/1199617
+
+Jira-Id: ADM-4312
+Signed-off-by: Oleh Cherpak <oleh.cherpak@globallogic.com>
+Test: adb logcat -b all | grep cameraservice
+Test: atest CtsCameraTestCases
+Change-Id: I8490fdbdb7c5515557a3ef0aba5356cfdb5e83f3
+(cherry picked from commit a5ecf74f58aa80bd8251a62fa57fdd838f9e0fb6)
+(cherry picked from commit f19b9d4355b475c98340a3e470643ef644bb0ed2)
+---
+ .../api/29.0/private/compat/28.0/28.0.ignore.cil     |  1 +
+ prebuilts/api/29.0/private/domain.te                 |  1 +
+ prebuilts/api/29.0/public/property.te                | 12 ++++++++++++
+ prebuilts/api/29.0/public/property_contexts          |  1 +
+ prebuilts/api/29.0/public/vendor_init.te             |  1 +
+ private/compat/28.0/28.0.ignore.cil                  |  1 +
+ private/domain.te                                    |  1 +
+ public/property.te                                   | 12 ++++++++++++
+ public/property_contexts                             |  1 +
+ public/vendor_init.te                                |  1 +
+ 10 files changed, 32 insertions(+)
+
+diff --git a/prebuilts/api/29.0/private/compat/28.0/28.0.ignore.cil b/prebuilts/api/29.0/private/compat/28.0/28.0.ignore.cil
+index 98c4b9c9b..e01d2576c 100644
+--- a/prebuilts/api/29.0/private/compat/28.0/28.0.ignore.cil
++++ b/prebuilts/api/29.0/private/compat/28.0/28.0.ignore.cil
+@@ -47,6 +47,7 @@
+     dnsresolver_service
+     dynamic_system_service
+     dynamic_system_prop
++    exported_camera_prop
+     face_service
+     face_vendor_data_file
+     fastbootd
+diff --git a/prebuilts/api/29.0/private/domain.te b/prebuilts/api/29.0/private/domain.te
+index 209eeb0dd..86e6e6036 100644
+--- a/prebuilts/api/29.0/private/domain.te
++++ b/prebuilts/api/29.0/private/domain.te
+@@ -70,6 +70,7 @@ compatible_property_only(`
+     get_prop({coredomain appdomain shell}, exported3_default_prop)
+     get_prop({coredomain appdomain shell}, exported3_radio_prop)
+     get_prop({coredomain appdomain shell}, exported3_system_prop)
++    get_prop({coredomain appdomain shell}, exported_camera_prop)
+     get_prop({domain -coredomain -appdomain}, vendor_default_prop)
+ ')
+ 
+diff --git a/prebuilts/api/29.0/public/property.te b/prebuilts/api/29.0/public/property.te
+index e166c000e..1dc101257 100644
+--- a/prebuilts/api/29.0/public/property.te
++++ b/prebuilts/api/29.0/public/property.te
+@@ -96,6 +96,7 @@ type vendor_security_patch_level_prop, property_type;
+ # Properties for whitelisting
+ type exported_audio_prop, property_type;
+ type exported_bluetooth_prop, property_type;
++type exported_camera_prop, property_type;
+ type exported_config_prop, property_type;
+ type exported_dalvik_prop, property_type;
+ type exported_default_prop, property_type;
+@@ -265,6 +266,16 @@ compatible_property_only(`
+     exported_bluetooth_prop
+   }:property_service set;
+ 
++  neverallow {
++    domain
++    -coredomain
++    -hal_camera_server
++    -cameraserver
++    -vendor_init
++  } {
++    exported_camera_prop
++  }:property_service set;
++
+   neverallow {
+     domain
+     -coredomain
+@@ -397,6 +408,7 @@ compatible_property_only(`
+     -exported3_radio_prop
+     -exported3_system_prop
+     -exported_bluetooth_prop
++    -exported_camera_prop
+     -exported_config_prop
+     -exported_dalvik_prop
+     -exported_default_prop
+diff --git a/prebuilts/api/29.0/public/property_contexts b/prebuilts/api/29.0/public/property_contexts
+index 46819af3a..859eaeeb9 100644
+--- a/prebuilts/api/29.0/public/property_contexts
++++ b/prebuilts/api/29.0/public/property_contexts
+@@ -267,6 +267,7 @@ aaudio.mixer_bursts u:object_r:exported_default_prop:s0 exact int
+ aaudio.mmap_exclusive_policy u:object_r:exported_default_prop:s0 exact int
+ aaudio.mmap_policy u:object_r:exported_default_prop:s0 exact int
+ aaudio.wakeup_delay_usec u:object_r:exported_default_prop:s0 exact int
++config.disable_cameraservice u:object_r:exported_camera_prop:s0 exact bool
+ gsm.sim.operator.numeric u:object_r:exported_radio_prop:s0 exact string
+ media.mediadrmservice.enable u:object_r:exported_default_prop:s0 exact bool
+ persist.rcs.supported u:object_r:exported_default_prop:s0 exact int
+diff --git a/prebuilts/api/29.0/public/vendor_init.te b/prebuilts/api/29.0/public/vendor_init.te
+index 375673cf8..9fc6b175e 100644
+--- a/prebuilts/api/29.0/public/vendor_init.te
++++ b/prebuilts/api/29.0/public/vendor_init.te
+@@ -223,6 +223,7 @@ set_prop(vendor_init, cpu_variant_prop)
+ set_prop(vendor_init, debug_prop)
+ set_prop(vendor_init, exported_audio_prop)
+ set_prop(vendor_init, exported_bluetooth_prop)
++set_prop(vendor_init, exported_camera_prop)
+ set_prop(vendor_init, exported_config_prop)
+ set_prop(vendor_init, exported_dalvik_prop)
+ set_prop(vendor_init, exported_default_prop)
+diff --git a/private/compat/28.0/28.0.ignore.cil b/private/compat/28.0/28.0.ignore.cil
+index 98c4b9c9b..e01d2576c 100644
+--- a/private/compat/28.0/28.0.ignore.cil
++++ b/private/compat/28.0/28.0.ignore.cil
+@@ -47,6 +47,7 @@
+     dnsresolver_service
+     dynamic_system_service
+     dynamic_system_prop
++    exported_camera_prop
+     face_service
+     face_vendor_data_file
+     fastbootd
+diff --git a/private/domain.te b/private/domain.te
+index 209eeb0dd..86e6e6036 100644
+--- a/private/domain.te
++++ b/private/domain.te
+@@ -70,6 +70,7 @@ compatible_property_only(`
+     get_prop({coredomain appdomain shell}, exported3_default_prop)
+     get_prop({coredomain appdomain shell}, exported3_radio_prop)
+     get_prop({coredomain appdomain shell}, exported3_system_prop)
++    get_prop({coredomain appdomain shell}, exported_camera_prop)
+     get_prop({domain -coredomain -appdomain}, vendor_default_prop)
+ ')
+ 
+diff --git a/public/property.te b/public/property.te
+index e166c000e..1dc101257 100644
+--- a/public/property.te
++++ b/public/property.te
+@@ -96,6 +96,7 @@ type vendor_security_patch_level_prop, property_type;
+ # Properties for whitelisting
+ type exported_audio_prop, property_type;
+ type exported_bluetooth_prop, property_type;
++type exported_camera_prop, property_type;
+ type exported_config_prop, property_type;
+ type exported_dalvik_prop, property_type;
+ type exported_default_prop, property_type;
+@@ -265,6 +266,16 @@ compatible_property_only(`
+     exported_bluetooth_prop
+   }:property_service set;
+ 
++  neverallow {
++    domain
++    -coredomain
++    -hal_camera_server
++    -cameraserver
++    -vendor_init
++  } {
++    exported_camera_prop
++  }:property_service set;
++
+   neverallow {
+     domain
+     -coredomain
+@@ -397,6 +408,7 @@ compatible_property_only(`
+     -exported3_radio_prop
+     -exported3_system_prop
+     -exported_bluetooth_prop
++    -exported_camera_prop
+     -exported_config_prop
+     -exported_dalvik_prop
+     -exported_default_prop
+diff --git a/public/property_contexts b/public/property_contexts
+index 46819af3a..859eaeeb9 100644
+--- a/public/property_contexts
++++ b/public/property_contexts
+@@ -267,6 +267,7 @@ aaudio.mixer_bursts u:object_r:exported_default_prop:s0 exact int
+ aaudio.mmap_exclusive_policy u:object_r:exported_default_prop:s0 exact int
+ aaudio.mmap_policy u:object_r:exported_default_prop:s0 exact int
+ aaudio.wakeup_delay_usec u:object_r:exported_default_prop:s0 exact int
++config.disable_cameraservice u:object_r:exported_camera_prop:s0 exact bool
+ gsm.sim.operator.numeric u:object_r:exported_radio_prop:s0 exact string
+ media.mediadrmservice.enable u:object_r:exported_default_prop:s0 exact bool
+ persist.rcs.supported u:object_r:exported_default_prop:s0 exact int
+diff --git a/public/vendor_init.te b/public/vendor_init.te
+index 375673cf8..9fc6b175e 100644
+--- a/public/vendor_init.te
++++ b/public/vendor_init.te
+@@ -223,6 +223,7 @@ set_prop(vendor_init, cpu_variant_prop)
+ set_prop(vendor_init, debug_prop)
+ set_prop(vendor_init, exported_audio_prop)
+ set_prop(vendor_init, exported_bluetooth_prop)
++set_prop(vendor_init, exported_camera_prop)
+ set_prop(vendor_init, exported_config_prop)
+ set_prop(vendor_init, exported_dalvik_prop)
+ set_prop(vendor_init, exported_default_prop)
+-- 
+2.28.0
+

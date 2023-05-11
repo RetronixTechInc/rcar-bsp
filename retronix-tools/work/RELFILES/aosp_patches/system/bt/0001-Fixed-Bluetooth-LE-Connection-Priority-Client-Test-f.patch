@@ -1,0 +1,51 @@
+From 910602dde59dc609201c30f3e558e6ac0e5f214b Mon Sep 17 00:00:00 2001
+From: Kevin Wang <wk091218@gmail.com>
+Date: Thu, 31 Oct 2019 15:12:59 +0800
+Subject: [PATCH] Fixed Bluetooth LE Connection Priority Client Test failure
+
+If bt controller doesn't support privacy 1.2, and the remote server
+use random address in advertisment, the server address set to the
+white list should be current server's address.
+
+Test: CTS Verifier > Bluetooth LE Connection Priority Client Test
+Bug: 143668960
+Jira-Id: ADM-4007 ADM-4009
+Change-Id: Ie044ae9ed6bdc40ea0e2e4dcb47f29fc88f26cf4
+---
+ stack/btm/btm_ble_bgconn.cc | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/stack/btm/btm_ble_bgconn.cc b/stack/btm/btm_ble_bgconn.cc
+index 209f49fe5..8205048f4 100644
+--- a/stack/btm/btm_ble_bgconn.cc
++++ b/stack/btm/btm_ble_bgconn.cc
+@@ -204,7 +204,12 @@ bool btm_add_dev_to_controller(bool to_add, const RawAddress& bd_addr) {
+ 
+   if (p_dev_rec != NULL && p_dev_rec->device_type & BT_DEVICE_TYPE_BLE) {
+     if (to_add) {
+-      if (!p_dev_rec->ble.identity_addr.IsEmpty()) {
++      if (!controller_get_interface()->supports_ble_privacy() &&
++          !p_dev_rec->ble.cur_rand_addr.IsEmpty()) {
++        background_connection_add(BLE_ADDR_RANDOM,
++                                  p_dev_rec->ble.cur_rand_addr);
++      } else if (p_dev_rec->ble.identity_addr != bd_addr &&
++                 !p_dev_rec->ble.identity_addr.IsEmpty()) {
+         background_connection_add(p_dev_rec->ble.identity_addr_type,
+                                   p_dev_rec->ble.identity_addr);
+       } else {
+@@ -218,7 +223,11 @@ bool btm_add_dev_to_controller(bool to_add, const RawAddress& bd_addr) {
+ 
+       p_dev_rec->ble.in_controller_list |= BTM_WHITE_LIST_BIT;
+     } else {
+-      if (!p_dev_rec->ble.identity_addr.IsEmpty()) {
++      if (!controller_get_interface()->supports_ble_privacy() &&
++          !p_dev_rec->ble.cur_rand_addr.IsEmpty()) {
++        background_connection_remove(p_dev_rec->ble.cur_rand_addr);
++      } else if (!p_dev_rec->ble.identity_addr.IsEmpty() &&
++                 p_dev_rec->ble.identity_addr != bd_addr) {
+         background_connection_remove(p_dev_rec->ble.identity_addr);
+       } else {
+         background_connection_remove(bd_addr);
+-- 
+2.28.0
+

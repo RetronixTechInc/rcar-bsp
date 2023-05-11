@@ -1,0 +1,32 @@
+From 7197003d85cefc6dd30159b1dfc9f6b14798ed67 Mon Sep 17 00:00:00 2001
+From: Oleh Cherpak <oleh.cherpak@globallogic.com>
+Date: Tue, 10 Dec 2019 12:58:54 +0200
+Subject: [PATCH] sign_target_apks: Add networkstack to default key_map
+
+Test: run cts -m CtsSecurityTestCases -t \
+	android.security.cts.PackageSignatureTest#testPackageSignatures
+Bug: 145955635
+Jira-Id: ADM-4257
+Change-Id: I1a1498562e2b5983010cb98e3edcd03ceb2cce19
+Signed-off-by: Oleh Cherpak <oleh.cherpak@globallogic.com>
+(cherry picked from commit 6b41129264caa1c2986c37ff0b03ea895a92cd88)
+(cherry picked from commit 6ffcffc856e9eea2d62bfdf15c04a8a2e4edd5c4)
+---
+ tools/releasetools/sign_target_files_apks.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/tools/releasetools/sign_target_files_apks.py b/tools/releasetools/sign_target_files_apks.py
+index 1b3d6f1096..67c50914e9 100755
+--- a/tools/releasetools/sign_target_files_apks.py
++++ b/tools/releasetools/sign_target_files_apks.py
+@@ -921,6 +921,7 @@ def BuildKeyMap(misc_info, key_mapping_options):
+           devkeydir + "/media":    d + "/media",
+           devkeydir + "/shared":   d + "/shared",
+           devkeydir + "/platform": d + "/platform",
++          devkeydir + "/networkstack": d + "/networkstack",
+           })
+     else:
+       OPTIONS.key_map[s] = d
+-- 
+2.28.0
+

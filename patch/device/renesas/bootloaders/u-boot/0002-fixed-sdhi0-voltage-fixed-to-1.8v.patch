@@ -1,0 +1,27 @@
+From 5dd656f274d1066e0022ca73a0f8b909fb11058d Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Wed, 10 May 2023 11:03:52 +0800
+Subject: [PATCH 2/2] fixed sdhi0 voltage fixed to 1.8v
+
+---
+ arch/arm/dts/r8a7795-salvator-x-u-boot.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/dts/r8a7795-salvator-x-u-boot.dts b/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
+index f4943a8c42..9c320d13b3 100644
+--- a/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
++++ b/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
+@@ -59,6 +59,10 @@
+ 	groups = "sdhi2_data8", "sdhi2_ctrl", "sdhi2_ds";
+ };
+ 
++&sdhi0_pins {
++	power-source = <1800>;
++};
++
+ &sdhi0 {
+ 	sd-uhs-sdr12;
+ 	sd-uhs-sdr25;
+-- 
+2.25.1
+

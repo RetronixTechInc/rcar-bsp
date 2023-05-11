@@ -1,0 +1,40 @@
+From 561f51bcdd67b92b01acb443706fb611a24034b1 Mon Sep 17 00:00:00 2001
+From: Sergii Piatakov <sergii.piatakov@globallogic.com>
+Date: Mon, 27 Apr 2020 11:47:37 +0300
+Subject: [PATCH 05/12] Skip transformation for invalid surface
+
+Do not perform parent and child transformation if the root surface is
+invalid. It can happen because the surface is released inside the
+`ThreadedRenderer` class when result of `syncAndDrawFrame` method is
+unsuccessful.
+
+Passing an invalid surface into a transaction is harmful because it
+leads a null pointer dereference in the native code.
+
+Test: run CTS tests and check crash caused by null pointer in logcat:
+      > run cts -m CtsCameraTestCases
+      $ adb logcat -v color | grep '\ F\ '
+Jira-Id: ADM-4216.
+Change-Id: Ief80a54265b010649447b54ed66a5187b81f2aaa
+Signed-off-by: Sergii Piatakov <sergii.piatakov@globallogic.com>
+---
+ core/java/android/view/SurfaceView.java | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/core/java/android/view/SurfaceView.java b/core/java/android/view/SurfaceView.java
+index d11548d687b..765b758bdc5 100644
+--- a/core/java/android/view/SurfaceView.java
++++ b/core/java/android/view/SurfaceView.java
+@@ -1034,6 +1034,9 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
+ 
+     private void setParentSpaceRectangle(Rect position, long frameNumber) {
+         final ViewRootImpl viewRoot = getViewRootImpl();
++        if (!viewRoot.mSurface.isValid()) {
++            return;
++        }
+ 
+         applySurfaceTransforms(mSurfaceControl, position, frameNumber);
+ 
+-- 
+2.28.0
+

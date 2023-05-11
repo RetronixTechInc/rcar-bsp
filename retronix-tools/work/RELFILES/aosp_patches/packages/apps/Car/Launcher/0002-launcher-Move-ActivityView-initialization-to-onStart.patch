@@ -1,0 +1,124 @@
+From ec2412b44148a8b288abe8a88b6299eccda872c9 Mon Sep 17 00:00:00 2001
+From: Dmytro Lavrikov <dmytro.lavrikov@globallogic.com>
+Date: Fri, 20 Mar 2020 14:24:22 +0200
+Subject: [PATCH 2/2] launcher: Move ActivityView initialization to onStart()
+
+The reason behind this change is that ActivityView grabs focus
+entirely and if it is not disposed it can cause issues in other
+activities, such as lock screen.
+
+Jira-ID: ADM-4464
+Signed-off-by: Dmytro Lavrikov <dmytro.lavrikov@globallogic.com>
+Change-Id: I40154f1c098b87efe664b7e72c0c5c0974e453c5
+---
+ res/layout/car_launcher.xml                   |  5 +--
+ .../android/car/carlauncher/CarLauncher.java  | 31 +++++++++++--------
+ 2 files changed, 19 insertions(+), 17 deletions(-)
+
+diff --git a/res/layout/car_launcher.xml b/res/layout/car_launcher.xml
+index 4b28105..98f1f59 100644
+--- a/res/layout/car_launcher.xml
++++ b/res/layout/car_launcher.xml
+@@ -73,15 +73,12 @@
+         style="@style/CardViewStyle"
+         android:layout_width="0dp"
+         android:layout_height="0dp"
++        android:id="@+id/maps_cardview"
+         android:layout_margin="@dimen/main_screen_widget_margin"
+         app:layout_constraintBottom_toTopOf="@+id/bottom_edge"
+         app:layout_constraintEnd_toStartOf="@+id/divider_vertical"
+         app:layout_constraintStart_toEndOf="@+id/start_edge"
+         app:layout_constraintTop_toBottomOf="@+id/top_edge">
+-        <ActivityView
+-            android:id="@+id/maps"
+-            android:layout_width="match_parent"
+-            android:layout_height="match_parent"/>
+     </androidx.cardview.widget.CardView>
+ 
+     <FrameLayout
+diff --git a/src/com/android/car/carlauncher/CarLauncher.java b/src/com/android/car/carlauncher/CarLauncher.java
+index 9476e8a..fdf22bb 100644
+--- a/src/com/android/car/carlauncher/CarLauncher.java
++++ b/src/com/android/car/carlauncher/CarLauncher.java
+@@ -19,7 +19,6 @@ package com.android.car.carlauncher;
+ import android.app.ActivityManager;
+ import android.app.ActivityOptions;
+ import android.app.ActivityView;
+-import android.app.UserSwitchObserver;
+ import android.content.Intent;
+ import android.content.res.Configuration;
+ import android.os.Bundle;
+@@ -27,11 +26,10 @@ import android.os.IRemoteCallback;
+ import android.os.RemoteException;
+ import android.os.SystemProperties;
+ import android.util.Log;
++import android.view.ViewGroup;
+ import android.widget.FrameLayout;
+-
+ import androidx.fragment.app.FragmentActivity;
+ import androidx.fragment.app.FragmentTransaction;
+-
+ import com.android.car.media.common.PlaybackFragment;
+ 
+ import java.util.Set;
+@@ -63,6 +61,9 @@ public class CarLauncher extends FragmentActivity {
+ 
+     private ActivityView mActivityView;
+     private boolean mActivityViewEnabled;
++
++    private ViewGroup mActivityViewContainer;
++
+     private boolean mActivityViewReady;
+     private boolean mIsStarted;
+ 
+@@ -118,10 +119,8 @@ public class CarLauncher extends FragmentActivity {
+             setContentView(R.layout.car_launcher);
+         }
+         initializeFragments();
+-        mActivityView = findViewById(R.id.maps);
+-        if (mActivityView != null) {
+-            mActivityView.setCallback(mActivityViewCallback);
+-        }
++
++        mActivityViewContainer = findViewById(R.id.maps_cardview);
+     }
+ 
+     @Override
+@@ -142,6 +141,13 @@ public class CarLauncher extends FragmentActivity {
+     @Override
+     protected void onStart() {
+         super.onStart();
++        if (mActivityViewContainer != null) {
++            mActivityView = new ActivityView(this);
++            mActivityViewContainer.addView(mActivityView);
++        }
++        if (mActivityView != null) {
++            mActivityView.setCallback(mActivityViewCallback);
++        }
+         mIsStarted = true;
+         maybeLogReady();
+     }
+@@ -149,15 +155,14 @@ public class CarLauncher extends FragmentActivity {
+     @Override
+     protected void onStop() {
+         super.onStop();
+-        mIsStarted = false;
+-    }
+-
+-    @Override
+-    protected void onDestroy() {
+-        super.onDestroy();
+         if (mActivityView != null && mActivityViewReady) {
+             mActivityView.release();
+         }
++        if (mActivityViewContainer != null) {
++            mActivityViewContainer.removeView(mActivityView);
++            mActivityView = null;
++        }
++        mIsStarted = false;
+     }
+ 
+     private void startMapsInActivityView() {
+-- 
+2.28.0
+

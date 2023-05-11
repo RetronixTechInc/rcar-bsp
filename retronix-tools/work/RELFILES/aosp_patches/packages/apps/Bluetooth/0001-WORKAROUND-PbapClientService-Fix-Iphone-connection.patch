@@ -1,0 +1,43 @@
+From 360198edd6c777df7d421b83481f7da8f9e257dc Mon Sep 17 00:00:00 2001
+From: Oleh Cherpak <oleh.cherpak@globallogic.com>
+Date: Fri, 17 Apr 2020 10:09:28 +0300
+Subject: [PATCH] [WORKAROUND] PbapClientService: Fix Iphone connection
+
+When Iphone connects with carkitt for the first time priority is still
+undefined.
+Test: 1. Enable Bluetooth on the device:
+	Go to Settings -> More -> Bluetooth -> + Pair new device on the
+	tested device
+	2. Initiate pairing from the iPhone UI:
+	Settings -> Bluetooth -> Choose the tested device
+	3. Get a message to confirm the pairing on the tested device
+	4. Get a message to confirm the pairing on iPhone
+	5. Get a message to allow access to the Contact list on the
+	iPhone
+	6. Check if the pairing is successful:
+	Go to the Calling menu via tapping on the handset icon on the
+	bottom menu
+Jira-Id: ADM-4626, ADM-4604
+Signed-off-by: Oleh Cherpak <oleh.cherpak@globallogic.com>
+Change-Id: Ice6da5fe271cfdaa9a4cb9a8f52ea887ef51dff4
+(cherry picked from commit b3c75e48f7d375354fb490ce75535339769493d9)
+---
+ src/com/android/bluetooth/pbapclient/PbapClientService.java | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/com/android/bluetooth/pbapclient/PbapClientService.java b/src/com/android/bluetooth/pbapclient/PbapClientService.java
+index 02b1e7a51..4c0d859d3 100644
+--- a/src/com/android/bluetooth/pbapclient/PbapClientService.java
++++ b/src/com/android/bluetooth/pbapclient/PbapClientService.java
+@@ -335,7 +335,7 @@ public class PbapClientService extends ProfileService {
+         }
+         enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM, "Need BLUETOOTH ADMIN permission");
+         if (DBG) Log.d(TAG, "Received request to ConnectPBAPPhonebook " + device.getAddress());
+-        if (getPriority(device) <= BluetoothProfile.PRIORITY_OFF) {
++        if (getPriority(device) == BluetoothProfile.PRIORITY_OFF) {
+             return false;
+         }
+         synchronized (mPbapClientStateMachineMap) {
+-- 
+2.28.0
+

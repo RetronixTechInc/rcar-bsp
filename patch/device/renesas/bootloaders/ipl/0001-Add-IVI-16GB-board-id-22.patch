@@ -1,0 +1,201 @@
+From ea1e18ccace3a901eb11330620a5f73b4fe267bb Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Wed, 10 May 2023 10:44:09 +0800
+Subject: [PATCH] Add IVI 16GB board id 22.
+
+---
+ plat/renesas/rcar/bl2_rcar_setup.c            |  10 +-
+ .../rcar/ddr/ddr_b/boot_init_dram_config.c    | 102 +++++++++++++++++-
+ plat/renesas/rcar/platform.mk                 |   4 +-
+ plat/renesas/rcar/qos/H3/qos_init_h3_v30.c    |   2 +-
+ 4 files changed, 107 insertions(+), 11 deletions(-)
+
+diff --git a/plat/renesas/rcar/bl2_rcar_setup.c b/plat/renesas/rcar/bl2_rcar_setup.c
+index 3b3859a30..6e42afe10 100644
+--- a/plat/renesas/rcar/bl2_rcar_setup.c
++++ b/plat/renesas/rcar/bl2_rcar_setup.c
+@@ -714,11 +714,11 @@ static void rcar_bl2_early_platform_setup(const meminfo_t *mem_layout)
+ 		NOTICE("BL2: CH0: 0x400000000 - 0x47fffffff, 2 GiB\n");
+ 		NOTICE("BL2: CH1: 0x500000000 - 0x57fffffff, 2 GiB\n");
+ #elif (RCAR_DRAM_LPDDR4_MEMCONF == 1) && (RCAR_DRAM_CHANNEL == 15)
+-		/* 8GB(2GBx4: default) */
+-		NOTICE("BL2: CH0: 0x400000000 - 0x47fffffff, 2 GiB\n");
+-		NOTICE("BL2: CH1: 0x500000000 - 0x57fffffff, 2 GiB\n");
+-		NOTICE("BL2: CH2: 0x600000000 - 0x67fffffff, 2 GiB\n");
+-		NOTICE("BL2: CH3: 0x700000000 - 0x77fffffff, 2 GiB\n");
++		/* 16GB(4GBx4: default) */
++		NOTICE("BL2: CH0: 0x400000000 - 0x4ffffffff, 4 GiB\n");
++		NOTICE("BL2: CH1: 0x500000000 - 0x5ffffffff, 4 GiB\n");
++		NOTICE("BL2: CH2: 0x600000000 - 0x6ffffffff, 4 GiB\n");
++		NOTICE("BL2: CH3: 0x700000000 - 0x7ffffffff, 4 GiB\n");
+ #endif /* RCAR_DRAM_LPDDR4_MEMCONF == 0 */
+ 	}
+ 	if ((reg & RCAR_PRODUCT_MASK) == RCAR_PRODUCT_E3) {
+diff --git a/plat/renesas/rcar/ddr/ddr_b/boot_init_dram_config.c b/plat/renesas/rcar/ddr/ddr_b/boot_init_dram_config.c
+index 211b6175f..74f3ad093 100644
+--- a/plat/renesas/rcar/ddr/ddr_b/boot_init_dram_config.c
++++ b/plat/renesas/rcar/ddr/ddr_b/boot_init_dram_config.c
+@@ -8,11 +8,11 @@
+  *	NUMBER OF BOARD CONFIGRATION
+  *	PLEASE DEFINE
+  ******************************************************************************/
+-#define BOARDNUM 22
++#define BOARDNUM 23
+ /*******************************************************************************
+  *	PLEASE SET board number or board judge function
+  ******************************************************************************/
+-#define BOARD_JUDGE_AUTO
++//~ #define BOARD_JUDGE_AUTO
+ #ifdef BOARD_JUDGE_AUTO
+ static uint32_t _board_judge(void);
+ static uint32_t boardcnf_get_brd_type(void)
+@@ -22,7 +22,7 @@ static uint32_t boardcnf_get_brd_type(void)
+ #else /* BOARD_JUDGE_AUTO */
+ static uint32_t boardcnf_get_brd_type(void)
+ {
+-		return 1;
++		return 22;
+ }
+ #endif /* BOARD_JUDGE_AUTO */
+ 
+@@ -1608,6 +1608,102 @@ static const struct _boardcnf boardcnfs[BOARDNUM] = {
+ 			  0, 0, 0, 0, 0, 0, 0, 0,
+ 			  0, 0, 0, 0, 0, 0, 0, 0 },
+ /*dm_adj_r*/		{ 0, 0, 0, 0 },
++/*dqdm_adj_r*/		{ 0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0 }
++		}
++	}
++},
++/*
++ * boardcnf[22] WISTRON IVI(2rank) board with H3 Ver.3.0 or later/SoC
++ */
++{
++	0x0f,		/* phyvalid */
++	0x01,		/* dbi_en */
++	0x0300,		/* cacs_dly */
++	0,		/* cacs_dly_adj */
++	0x0300,		/* dqdm_dly_w */
++	0x00a0,		/* dqdm_dly_r */
++	{
++/*ch[0]*/	{
++/*ddr_density[]*/	{ 0x04, 0x04 },
++/*ca_swap*/		0x00543210,
++/*dqs_swap*/		0x3210,
++/*dq_swap[]*/		{ 0x27645310, 0x75346210, 0x53467210, 0x23674510 },
++/*dm_swap[]*/		{ 0x08, 0x08, 0x08, 0x08 },
++/*wdqlvl_patt[]*/	WDQLVL_PAT,
++/*cacs_adj*/		{ 0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0 },
++/*dm_adj_w*/		{ 0, 0, 0, 0 },
++/*dqdm_adj_w*/		{ 0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0 },
++/*dm_adj_r*/		{ 0, 0, 0, 0 },
++/*dqdm_adj_r*/		{ 0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0 }
++		},
++/*ch[1]*/	{
++/*ddr_density[]*/	{ 0x04, 0x04 },
++/*ca_swap*/		0x00543210,
++/*dqs_swap*/		0x2301,
++/*dq_swap[]*/		{ 0x23764510, 0x43257610, 0x43752610, 0x37652401 },
++/*dm_swap[]*/		{ 0x08, 0x08, 0x08, 0x08 },
++/*wdqlvl_patt[]*/	WDQLVL_PAT,
++/*cacs_adj*/	/*	{ 0, 0, 0, 0, 0, 0, 0, 0, */
++/*cacs_adj*/		{ -128, -128, -128, -128, -128, -128, 0, 0,
++			  0, 0 },
++/*dm_adj_w*/		{ 0, 0, 0, 0 },
++/*dqdm_adj_w*/		{ 0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0 },
++/*dm_adj_r*/		{ 0, 0, 0, 0 },
++/*dqdm_adj_r*/		{ 0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0 }
++		},
++/*ch[2]*/	{
++/*ddr_density[]*/	{ 0x04, 0x04 },
++/*ca_swap*/		0x00452103,
++/*dqs_swap*/		0x3210,
++/*dq_swap[]*/		{ 0x32764510, 0x43257610, 0x43752610, 0x26573401 },
++/*dm_swap[]*/		{ 0x08, 0x08, 0x08, 0x08 },
++/*wdqlvl_patt[]*/	WDQLVL_PAT,
++/*cacs_adj*/		{ 0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0 },
++/*dm_adj_w*/		{ 0, 0, 0, 0 },
++/*dqdm_adj_w*/		{ 0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0 },
++/*dm_adj_r*/		{ 0, 0, 0, 0 },
++/*dqdm_adj_r*/		{ 0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0 }
++		},
++/*ch[3]*/	{
++/*ddr_density[]*/	{ 0x04, 0x04 },
++/*ca_swap*/		0x00520413,
++/*dqs_swap*/		0x2301,
++/*dq_swap[]*/		{ 0x47652301, 0x75346210, 0x53467210, 0x32674501 },
++/*dm_swap[]*/		{ 0x08, 0x08, 0x08, 0x08 },
++/*wdqlvl_patt[]*/	WDQLVL_PAT,
++/*cacs_adj*/	/*	{ 0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0 }, */
++/*cacs_adj*/		{ 30, 30, 30, 30, 30, 30, 30, 30,
++			  30, 30 },
++/*dm_adj_w*/		{ 0, 0, 0, 0 },
++/*dqdm_adj_w*/		{ 0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0,
++			  0, 0, 0, 0, 0, 0, 0, 0 },
++/*dm_adj_r*/		{ 0, 0, 0, 0 },
+ /*dqdm_adj_r*/		{ 0, 0, 0, 0, 0, 0, 0, 0,
+ 			  0, 0, 0, 0, 0, 0, 0, 0,
+ 			  0, 0, 0, 0, 0, 0, 0, 0,
+diff --git a/plat/renesas/rcar/platform.mk b/plat/renesas/rcar/platform.mk
+index 8d45f59b5..5d355be56 100644
+--- a/plat/renesas/rcar/platform.mk
++++ b/plat/renesas/rcar/platform.mk
+@@ -282,7 +282,7 @@ $(eval $(call add_define,LIFEC_DBSC_PROTECT_ENABLE))
+ 
+ # Process PMIC_ROHM_BD9571 flag
+ ifndef PMIC_ROHM_BD9571
+-PMIC_ROHM_BD9571 := 1
++PMIC_ROHM_BD9571 := 0
+ endif
+ $(eval $(call add_define,PMIC_ROHM_BD9571))
+ 
+@@ -316,7 +316,7 @@ $(eval $(call add_define,RCAR_REWT_TRAINING))
+ 
+ # Process RCAR_SYSTEM_SUSPEND flag
+ ifndef RCAR_SYSTEM_SUSPEND
+-RCAR_SYSTEM_SUSPEND := 1
++RCAR_SYSTEM_SUSPEND := 0
+ endif
+ $(eval $(call add_define,RCAR_SYSTEM_SUSPEND))
+ 
+diff --git a/plat/renesas/rcar/qos/H3/qos_init_h3_v30.c b/plat/renesas/rcar/qos/H3/qos_init_h3_v30.c
+index 2dc8e74c9..2b2a932ce 100644
+--- a/plat/renesas/rcar/qos/H3/qos_init_h3_v30.c
++++ b/plat/renesas/rcar/qos/H3/qos_init_h3_v30.c
+@@ -133,7 +133,7 @@ void qos_init_h3_v30(uint32_t board_type)
+ 	unsigned int split_area = 0x1CU;
+ 	dbsc_setting();
+ 
+-	if (board_type == 7)
++	if (board_type == 7 || board_type == 22)
+ 		split_area = 0x1BU;
+ 	else if (board_type == 8)                             /* default 2GB */
+ 		split_area = 0x1CU;
+-- 
+2.25.1
+

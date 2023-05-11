@@ -1,0 +1,48 @@
+From 37e3919f8d097f07acd7516badb982142a69f47c Mon Sep 17 00:00:00 2001
+From: Oleh Cherpak <oleh.cherpak@globallogic.com>
+Date: Tue, 21 Jan 2020 16:46:28 +0200
+Subject: [PATCH] Wifi: Fix SetCountryCode Command
+
+WIFI_SUBCMD_SET_COUNTRY_CODE doesn't work with
+rtl8812au driver. It is better to use common nl80211
+command.
+
+Jira-Id: ADM-4418
+Test: Manual
+Signed-off-by: Oleh Cherpak <oleh.cherpak@globallogic.com>
+Change-Id: Iac3bd0b547887ca52c2e66a88ff70529e477bd25
+---
+ wifi/wifi_hal/wifi_hal.cpp | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/wifi/wifi_hal/wifi_hal.cpp b/wifi/wifi_hal/wifi_hal.cpp
+index 508268e..211cc4e 100644
+--- a/wifi/wifi_hal/wifi_hal.cpp
++++ b/wifi/wifi_hal/wifi_hal.cpp
+@@ -752,21 +752,17 @@ public:
+         mCountryCode = country_code;
+         }
+     virtual int create() {
+-        int ret;
++        int ret = mMsg.create(NL80211_CMD_REQ_SET_REG);
+ 
+-        ret = mMsg.create(GOOGLE_OUI, WIFI_SUBCMD_SET_COUNTRY_CODE);
+         if (ret < 0) {
+              ALOGE("Can't create message to send to driver - %d", ret);
+              return ret;
+         }
+ 
+-        nlattr *data = mMsg.attr_start(NL80211_ATTR_VENDOR_DATA);
+-        ret = mMsg.put_string(ANDR_WIFI_ATTRIBUTE_COUNTRY, mCountryCode);
++        ret = mMsg.put_string(NL80211_ATTR_REG_ALPHA2, mCountryCode);
+         if (ret < 0) {
+             return ret;
+         }
+-
+-        mMsg.attr_end(data);
+         return WIFI_SUCCESS;
+ 
+     }
+-- 
+2.28.0
+

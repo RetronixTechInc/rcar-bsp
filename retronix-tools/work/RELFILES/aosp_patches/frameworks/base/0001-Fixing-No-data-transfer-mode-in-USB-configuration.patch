@@ -1,0 +1,29 @@
+From 2e43192ec63734135ebc25081a3f277b450b4fa3 Mon Sep 17 00:00:00 2001
+From: "a.lukianenko" <a.lukianenko@globallogic.com>
+Date: Tue, 18 Jun 2019 18:02:52 +0300
+Subject: [PATCH 01/12] Fixing 'No data transfer' mode in USB configuration.
+
+Signed-off-by: a.lukianenko <a.lukianenko@globallogic.com>
+(cherry picked from commit 882c7e05652456aa1054ff33e3991000171c3d0e)
+(cherry picked from commit 0bc69aaaf02439168e3f04f34db7be11a187b372)
+Change-Id: I5acc8de397909e7bf2937cc1a0f368e8db80da3d
+---
+ services/usb/java/com/android/server/usb/UsbDeviceManager.java | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/services/usb/java/com/android/server/usb/UsbDeviceManager.java b/services/usb/java/com/android/server/usb/UsbDeviceManager.java
+index 5b7d81697c8..45b840ca976 100644
+--- a/services/usb/java/com/android/server/usb/UsbDeviceManager.java
++++ b/services/usb/java/com/android/server/usb/UsbDeviceManager.java
+@@ -909,6 +909,8 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
+                     if (!mScreenLocked && mScreenUnlockedFunctions != UsbManager.FUNCTION_NONE) {
+                         // If the screen is unlocked, also set current functions.
+                         setScreenUnlockedFunctions();
++                    } else {
++                        setEnabledFunctions(UsbManager.FUNCTION_NONE, false);
+                     }
+                     break;
+                 case MSG_UPDATE_SCREEN_LOCK:
+-- 
+2.28.0
+

@@ -1,0 +1,38 @@
+From bbb7bc286ab8fcf76ce46e64075cb6f870c38bfb Mon Sep 17 00:00:00 2001
+From: Dmytro Lavrikov <dmytro.lavrikov@globallogic.com>
+Date: Wed, 21 Aug 2019 17:13:01 +0300
+Subject: [PATCH 02/12] immersive-mode: Fix duplication of immersive window
+ confirmation
+
+Since we have multiple users running at the same time
+(at least 2, headless system user and regular user) when
+multiuser feature is enabled we get multiple calls to
+ImmersiveModeConfirmation#handleShow and only one
+ImmersiveModeConfirmation#handleHide passes correctly.
+We need only one confirmation for a fullscreen mode,
+so now the check is added to avoid duplication.
+
+Signed-off-by: Dmytro Lavrikov <dmytro.lavrikov@globallogic.com>
+Jira-ID: ADM-3681
+Change-Id: Ic6c490d0400eb8b5cfb85fb159c0726f57eb01bc
+---
+ .../java/com/android/server/wm/ImmersiveModeConfirmation.java  | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/services/core/java/com/android/server/wm/ImmersiveModeConfirmation.java b/services/core/java/com/android/server/wm/ImmersiveModeConfirmation.java
+index d774dc3fd2f..09ee5270827 100644
+--- a/services/core/java/com/android/server/wm/ImmersiveModeConfirmation.java
++++ b/services/core/java/com/android/server/wm/ImmersiveModeConfirmation.java
+@@ -355,6 +355,9 @@ public class ImmersiveModeConfirmation {
+     private void handleShow() {
+         if (DEBUG) Slog.d(TAG, "Showing immersive mode confirmation");
+ 
++        if (mClingWindow != null) {
++            return;
++        }
+         mClingWindow = new ClingWindowView(mContext, mConfirm);
+ 
+         // we will be hiding the nav bar, so layout as if it's already hidden
+-- 
+2.28.0
+

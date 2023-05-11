@@ -1,0 +1,36 @@
+From 9e9a79811b7283d0d9a522c7b2d7afba31d70690 Mon Sep 17 00:00:00 2001
+From: Artem Radchenko <artem.radchenko@globallogic.com>
+Date: Tue, 19 May 2020 17:35:12 +0300
+Subject: [PATCH 07/12] Skip boot completed check on initHvac
+
+BootComplete receiver in CarStatusBar is registered manually in java.
+Sometimes boot_completed event is already sent when receiver is registered,
+so temperature views are not initialized correctly.
+To fix this issue we init Hvac always when restarting nav bar.
+
+Test: reboot many times and look if temp views are initialized
+JiraId: ADM-4731
+Signed-off-by: Artem Radchenko <artem.radchenko@globallogic.com>
+Change-Id: Iab9a0032cf3ad10e056e4030c4aaf294a631da8d
+---
+ .../src/com/android/systemui/statusbar/car/CarStatusBar.java  | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/packages/CarSystemUI/src/com/android/systemui/statusbar/car/CarStatusBar.java b/packages/CarSystemUI/src/com/android/systemui/statusbar/car/CarStatusBar.java
+index 719bfbc08df..8ea3212e45b 100644
+--- a/packages/CarSystemUI/src/com/android/systemui/statusbar/car/CarStatusBar.java
++++ b/packages/CarSystemUI/src/com/android/systemui/statusbar/car/CarStatusBar.java
+@@ -554,9 +554,7 @@ public class CarStatusBar extends StatusBar implements CarBatteryController.Batt
+         }
+ 
+         buildNavBarContent();
+-        if (mBootCompleted) {
+-            initHvac();
+-        }
++        initHvac();
+         // If the UI was rebuilt (day/night change) while the keyguard was up we need to
+         // correctly respect that state.
+         if (mIsKeyguard) {
+-- 
+2.28.0
+

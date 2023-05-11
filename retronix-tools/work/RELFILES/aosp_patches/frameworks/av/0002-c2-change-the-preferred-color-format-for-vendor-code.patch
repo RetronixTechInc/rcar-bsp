@@ -1,0 +1,68 @@
+From cb918db3d33039acaf9079381a164b9999265637 Mon Sep 17 00:00:00 2001
+From: Andrii Romanchuk <andrii.romanchuk@globallogic.com>
+Date: Mon, 27 Apr 2020 14:23:07 +0300
+Subject: [PATCH 2/3] c2: change the preferred color format for vendor codecs
+
+The patch weakens "COLOR_FormatSurface" priority for non-standard
+video/image codecs to fix "null pointer dereference" error manifested
+by test crash.
+
+ROOT CAUSE: the issue is caused by "COLOR_FormatSurface" hardcoding
+as preferred color format, which leads to
+"GraphicView2MediaImageConverter" initialization failure in the call
+to "GraphicBlockBuffer::Allocate" and nullptr as a function return
+value.
+
+IMPORTANT: the issue doesn't have 100 % reproduce rate due to race in
+CCodecBufferChannel.cpp. It can be seen in cases when mutex lock in
+the call to "getInputBufferArray" precedes corresponding lock in the
+call to "requestInitialInputBuffers".
+
+To increase the reproducibility of the issue one may insert thread
+sleep between "onStartCompleted" callback in CCodec.cpp and mutex lock
+in the "requestInitialInputBuffers" function call.
+
+REMARK: the issue can be reproduced on standard SW codecs as well.
+To do so, you just need to change its name replacing "android"
+substring to any other.
+
+Jira-Id: ADM-4232
+Test: r cts \
+    -m CtsMediaTestCases \
+    -t android.media.cts.MediaCodecCapabilitiesTest# \
+        testGetMaxSupportedInstances
+
+Signed-off-by: Andrii Romanchuk <andrii.romanchuk@globallogic.com>
+Change-Id: I25a95080e03a59820b79372550c809d41b6f4242
+---
+ media/codec2/sfplugin/Codec2InfoBuilder.cpp | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/media/codec2/sfplugin/Codec2InfoBuilder.cpp b/media/codec2/sfplugin/Codec2InfoBuilder.cpp
+index 6b75ebafbe..bfcfd8b30a 100644
+--- a/media/codec2/sfplugin/Codec2InfoBuilder.cpp
++++ b/media/codec2/sfplugin/Codec2InfoBuilder.cpp
+@@ -196,10 +196,6 @@ void addSupportedColorFormats(
+     bool encoder = trait.kind == C2Component::KIND_ENCODER;
+     if (mediaType.find("video") != std::string::npos
+             || mediaType.find("image") != std::string::npos) {
+-        // vendor video codecs prefer opaque format
+-        if (trait.name.find("android") == std::string::npos) {
+-            caps->addColorFormat(COLOR_FormatSurface);
+-        }
+         caps->addColorFormat(COLOR_FormatYUV420Flexible);
+         caps->addColorFormat(COLOR_FormatYUV420Planar);
+         caps->addColorFormat(COLOR_FormatYUV420SemiPlanar);
+@@ -207,7 +203,8 @@ void addSupportedColorFormats(
+         caps->addColorFormat(COLOR_FormatYUV420PackedSemiPlanar);
+         // framework video encoders must support surface format, though it is unclear
+         // that they will be able to map it if it is opaque
+-        if (encoder && trait.name.find("android") != std::string::npos) {
++        // vendor video codecs always support opaque format
++        if (encoder || trait.name.find("android") == std::string::npos) {
+             caps->addColorFormat(COLOR_FormatSurface);
+         }
+     }
+-- 
+2.28.0
+

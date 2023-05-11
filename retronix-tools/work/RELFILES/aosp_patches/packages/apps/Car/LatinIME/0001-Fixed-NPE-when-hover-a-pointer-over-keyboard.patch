@@ -1,0 +1,30 @@
+From 6ed2ae9f509ba1d9411af7586f288e65fb29c82b Mon Sep 17 00:00:00 2001
+From: Artem Radchenko <artem.radchenko@globallogic.com>
+Date: Thu, 6 Jun 2019 16:33:31 +0300
+Subject: [PATCH] Fixed NPE when hover a pointer over keyboard
+
+JiraId: ADM-3311
+Signed-off-by: Artem Radchenko <artem.radchenko@globallogic.com>
+(cherry picked from commit 0c4ace84353da62513bf09568092af226f91a53e)
+(cherry picked from commit ac7b7ff8ad7b55051a0cd2a58d4bdca6d7ba479b)
+Change-Id: Iab1b2536b09b551e264926f2af27c7cbf5da76de
+---
+ src/com/android/inputmethod/latin/car/KeyboardView.java | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/com/android/inputmethod/latin/car/KeyboardView.java b/src/com/android/inputmethod/latin/car/KeyboardView.java
+index 52a2fde..68412f9 100644
+--- a/src/com/android/inputmethod/latin/car/KeyboardView.java
++++ b/src/com/android/inputmethod/latin/car/KeyboardView.java
+@@ -289,7 +289,7 @@ public class KeyboardView extends View implements View.OnClickListener {
+     public KeyboardView(Context context, AttributeSet attrs, int defStyle) {
+         super(context, attrs, defStyle);
+         mContext = context;
+-
++        mAccessibilityManager = (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
+         TypedArray a =
+                 context.obtainStyledAttributes(
+                         attrs, R.styleable.KeyboardView, defStyle, 0);
+-- 
+2.28.0
+

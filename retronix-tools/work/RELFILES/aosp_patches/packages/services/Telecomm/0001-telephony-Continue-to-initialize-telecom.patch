@@ -1,0 +1,73 @@
+From 80940d156f296e66223972995f0dd4876b644053 Mon Sep 17 00:00:00 2001
+From: bxu10x <bingx.xu@intel.com>
+Date: Thu, 30 Aug 2018 11:16:58 +0800
+Subject: [PATCH] telephony: Continue to initialize telecom
+
+for supporting Bluetooth Hands-free profile (HFP) on automotive device when "config_voice_capable" is set to false.
+
+Jira task: ADM-2274.
+Jira-Id: ADM-3840.
+Bug: 70360793
+Test: run cts -m CtsTelephonyTestCases -t android.telephony.cts.CarrierConfigManagerTest#testNotifyConfigChangedForSubId
+      run cts -m CtsTelephonyTestCases -t android.telephony.cts.TelephonyManagerTest#testTelephonyManager
+
+Signed-off-by: bxu10x <bingx.xu@intel.com>
+(cherry picked from commit 294f3b8fdf9043f4f5a4922eb72c3d4c4183d775)
+Change-Id: If0ef9298fb021ed14468644808a5d66ce577347d
+---
+ .../android/server/telecom/TelecomServiceImpl.java    | 11 +++++++----
+ .../telecom/components/UserCallIntentProcessor.java   |  8 ++++++--
+ 2 files changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/src/com/android/server/telecom/TelecomServiceImpl.java b/src/com/android/server/telecom/TelecomServiceImpl.java
+index e8030c8c5..bbababd24 100644
+--- a/src/com/android/server/telecom/TelecomServiceImpl.java
++++ b/src/com/android/server/telecom/TelecomServiceImpl.java
+@@ -445,11 +445,14 @@ public class TelecomServiceImpl {
+             try {
+                 Log.startSession("TSI.rPA");
+                 synchronized (mLock) {
+-                    if (!mContext.getApplicationContext().getResources().getBoolean(
+-                            com.android.internal.R.bool.config_voice_capable)) {
+-                        Log.w(this,
++                    if (!mContext.getPackageManager()
++                        .hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)) {
++                        if (!mContext.getApplicationContext().getResources().getBoolean(
++                                com.android.internal.R.bool.config_voice_capable)) {
++                            Log.w(this,
+                                 "registerPhoneAccount not allowed on non-voice capable device.");
+-                        return;
++                            return;
++                        }
+                     }
+                     try {
+                         enforcePhoneAccountModificationForPackage(
+diff --git a/src/com/android/server/telecom/components/UserCallIntentProcessor.java b/src/com/android/server/telecom/components/UserCallIntentProcessor.java
+index ae4a7d803..1a6440c55 100644
+--- a/src/com/android/server/telecom/components/UserCallIntentProcessor.java
++++ b/src/com/android/server/telecom/components/UserCallIntentProcessor.java
+@@ -29,6 +29,8 @@ import android.telecom.TelecomManager;
+ import android.telecom.VideoProfile;
+ import android.telephony.PhoneNumberUtils;
+ import android.text.TextUtils;
++import android.content.pm.PackageManager;
++
+ 
+ import com.android.server.telecom.CallIntentProcessor;
+ import com.android.server.telecom.R;
+@@ -82,8 +84,10 @@ public class UserCallIntentProcessor {
+     public void processIntent(Intent intent, String callingPackageName,
+             boolean canCallNonEmergency, boolean isLocalInvocation) {
+         // Ensure call intents are not processed on devices that are not capable of calling.
+-        if (!isVoiceCapable()) {
+-            return;
++        if (!mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)) {
++            if (!isVoiceCapable()) {
++                return;
++            }
+         }
+ 
+         String action = intent.getAction();
+-- 
+2.28.0
+

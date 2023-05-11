@@ -1,0 +1,39 @@
+From 29b79dc8119ede1fa5d4a859e2fa0f945a0b81b6 Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Wed, 10 May 2023 14:55:55 +0800
+Subject: [PATCH] fixed plat_id is H3v3_PLAT_ID(0x04779530)
+
+---
+ common/device-tree-common.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/common/device-tree-common.c b/common/device-tree-common.c
+index 6ab4f41453..04e7ace2e9 100644
+--- a/common/device-tree-common.c
++++ b/common/device-tree-common.c
+@@ -100,16 +100,18 @@ ulong get_current_plat_id(void)
+ 	if (!ret)
+ 		ret = dm_i2c_read(dev, 0x70, &board_id, 1);
+ #endif
+-	if (ret ) {
+-		printf("Error reading platform Id (%d)\n", ret);
+-		return ret;
+-	}
++	//~ if (ret ) {
++		//~ printf("Error reading platform Id (%d)\n", ret);
++		//~ return ret;
++	//~ }
+ 
+ 	if (board_id == 0xff) { /* Not programmed? */
+ 		board_id = 0;
+ 	}
+ 	plat_id |= ((board_id >> 3) << 24);
+ 
++	plat_id = H3v3_PLAT_ID;
++
+ 	return plat_id;
+ }
+ 
+-- 
+2.25.1
+

@@ -1,0 +1,99 @@
+From 52fede3e503586057d72ef9cf89c7864a2d61953 Mon Sep 17 00:00:00 2001
+From: Sergii Piatakov <sergii.piatakov@globallogic.com>
+Date: Mon, 15 Jun 2020 15:42:11 +0300
+Subject: [PATCH 10/12] fix broadcast receivers overflow for system_server
+
+Every time when user is switched the `UsbSettingsManager` creates a new
+instance of settings object for the new user. It leads to creating
+several receivers and subscribing to some broadcast messages. Then
+system is switched on other user, settings for the old user are removed
+from the internal container, but receivers are not unsubscribed. As a
+result, the number of receivers for the `system_server` process is
+continuously increased and may exceed the allowed limit.
+
+It is proposed to explicitly unscribe receivers before remove settings.
+
+Jira-Id: ADM-4805
+Test: flash a DUT with user build and then run:
+      > run cts -m CtsDevicePolicyManagerTestCases
+      at least two times, check that DUT is not in the recovery mode;
+      or switch user ~1000 times:
+      $ adb shell am switch-user 0
+      $ adb shell am switch-user 10
+      and check that logcat doesn't contain a line:
+      E SystemServiceManager: java.lang.IllegalStateException: \
+          Too many receivers, total of 1000, registered
+Change-Id: I4bb9feb408ce7c321a56d0e573c45c8794ed6860
+Signed-off-by: Sergii Piatakov <sergii.piatakov@globallogic.com>
+---
+ .../android/server/usb/MtpNotificationManager.java    | 11 +++++++++--
+ .../server/usb/UsbProfileGroupSettingsManager.java    |  9 +++++++++
+ .../com/android/server/usb/UsbSettingsManager.java    |  1 +
+ 3 files changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/services/usb/java/com/android/server/usb/MtpNotificationManager.java b/services/usb/java/com/android/server/usb/MtpNotificationManager.java
+index 462ee19124f..af0e9541dca 100644
+--- a/services/usb/java/com/android/server/usb/MtpNotificationManager.java
++++ b/services/usb/java/com/android/server/usb/MtpNotificationManager.java
+@@ -64,12 +64,13 @@ class MtpNotificationManager {
+ 
+     private final Context mContext;
+     private final OnOpenInAppListener mListener;
++    private final Receiver mReceiver;
+ 
+     MtpNotificationManager(Context context, OnOpenInAppListener listener) {
+         mContext = context;
+         mListener = listener;
+-        final Receiver receiver = new Receiver();
+-        context.registerReceiver(receiver, new IntentFilter(ACTION_OPEN_IN_APPS));
++        mReceiver = new Receiver();
++        context.registerReceiver(mReceiver, new IntentFilter(ACTION_OPEN_IN_APPS));
+     }
+ 
+     void showNotification(UsbDevice device) {
+@@ -154,4 +155,10 @@ class MtpNotificationManager {
+     static interface OnOpenInAppListener {
+         void onOpenInApp(UsbDevice device);
+     }
++
++    public void unregister() {
++        if (mContext != null) {
++            mContext.unregisterReceiver(mReceiver);
++        }
++    }
+ }
+diff --git a/services/usb/java/com/android/server/usb/UsbProfileGroupSettingsManager.java b/services/usb/java/com/android/server/usb/UsbProfileGroupSettingsManager.java
+index 74c3939a1b1..1282781ae32 100644
+--- a/services/usb/java/com/android/server/usb/UsbProfileGroupSettingsManager.java
++++ b/services/usb/java/com/android/server/usb/UsbProfileGroupSettingsManager.java
+@@ -247,6 +247,15 @@ class UsbProfileGroupSettingsManager {
+         mUsbHandlerManager = usbResolveActivityManager;
+     }
+ 
++    /**
++     * Unregister all broadcast receivers. Must be called explicitly before
++     * object deletion.
++     */
++    public void unregisterReceivers() {
++        mPackageMonitor.unregister();
++        mMtpNotificationManager.unregister();
++    }
++
+     /**
+      * Remove all defaults for a user.
+      *
+diff --git a/services/usb/java/com/android/server/usb/UsbSettingsManager.java b/services/usb/java/com/android/server/usb/UsbSettingsManager.java
+index 27566f04c28..14e8c0f8252 100644
+--- a/services/usb/java/com/android/server/usb/UsbSettingsManager.java
++++ b/services/usb/java/com/android/server/usb/UsbSettingsManager.java
+@@ -127,6 +127,7 @@ class UsbSettingsManager {
+             if (mSettingsByProfileGroup.indexOfKey(userToRemove.getIdentifier()) >= 0) {
+                 // The user to remove is the parent user of the group. The parent is the last user
+                 // that gets removed. All state will be removed with the user
++                mSettingsByProfileGroup.get(userToRemove.getIdentifier()).unregisterReceivers();
+                 mSettingsByProfileGroup.remove(userToRemove.getIdentifier());
+             } else {
+                 // We cannot find the parent user of the user that is removed, hence try to remove
+-- 
+2.28.0
+

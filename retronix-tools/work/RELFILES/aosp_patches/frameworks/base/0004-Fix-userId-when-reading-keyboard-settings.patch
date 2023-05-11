@@ -1,0 +1,52 @@
+From b377f598930c4853147ecdf7ac10a08d62ada1fd Mon Sep 17 00:00:00 2001
+From: Artem Radchenko <artem.radchenko@globallogic.com>
+Date: Mon, 13 Apr 2020 11:58:49 +0300
+Subject: [PATCH 04/12] Fix userId when reading keyboard settings
+
+Properties SHOW_IME_WITH_HARD_KEYBOARD and
+ACCESSIBILITY_SOFT_KEYBOARD_MODE should be read for current
+user instead of default system user from ContentResolver.
+Fixes cts tests for automotive devices with headless_system_user_enabled.
+
+Test: run cts -m CtsAccessibilityServiceTestCases -t  \
+android.accessibilityservice.cts.AccessibilitySoftKeyboardModesTest#testApiReturnValues_shouldChangeValueOnRequestAndSendCallback
+run cts -m CtsAccessibilityServiceTestCases -t  \
+android.accessibilityservice.cts.AccessibilitySoftKeyboardModesTest#secondServiceChangingTheShowMode_updatesModeAndNotifiesFirstService
+
+JiraId: ADM-4206
+Signed-off-by: Artem Radchenko <artem.radchenko@globallogic.com>
+Change-Id: I68e2f8391290d99fd83a5b3816f604e253084242
+(cherry picked from commit 053d7a7fe7a45e7747372b40adafc56677638d35)
+---
+ .../server/accessibility/AccessibilityManagerService.java  | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java b/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java
+index 9bad734cfcf..9d69640494e 100644
+--- a/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java
++++ b/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java
+@@ -4192,7 +4192,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
+         public void reconcileSoftKeyboardModeWithSettingsLocked() {
+             final ContentResolver cr = mContext.getContentResolver();
+             final boolean showWithHardKeyboardSettings =
+-                    Settings.Secure.getInt(cr, Settings.Secure.SHOW_IME_WITH_HARD_KEYBOARD, 0) != 0;
++                    Settings.Secure.getIntForUser(cr,
++                        Settings.Secure.SHOW_IME_WITH_HARD_KEYBOARD, 0, mUserId) != 0;
+             if (mSoftKeyboardShowMode == SHOW_MODE_IGNORE_HARD_KEYBOARD) {
+                 if (!showWithHardKeyboardSettings) {
+                     // The user has overridden the setting. Respect that and prevent further changes
+@@ -4248,9 +4249,9 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
+         }
+ 
+         private int getSoftKeyboardValueFromSettings() {
+-            return Settings.Secure.getInt(mContext.getContentResolver(),
++            return Settings.Secure.getIntForUser(mContext.getContentResolver(),
+                     Settings.Secure.ACCESSIBILITY_SOFT_KEYBOARD_MODE,
+-                    SHOW_MODE_AUTO) & SHOW_MODE_MASK;
++                    SHOW_MODE_AUTO, mUserId) & SHOW_MODE_MASK;
+         }
+ 
+         private boolean getOriginalHardKeyboardValue() {
+-- 
+2.28.0
+

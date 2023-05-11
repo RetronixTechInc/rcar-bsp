@@ -1,0 +1,38 @@
+From 2e75f11982b84101e48e1915ace9ddd22d2acb8b Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Wed, 10 May 2023 10:39:53 +0800
+Subject: [PATCH] support QSPI_ONBOARD_IVI : S25FS512S
+
+---
+ core/arch/arm/plat-rcar/drivers/qspi_flash_common.c       | 1 +
+ core/arch/arm/plat-rcar/drivers/qspi_hyper_flash_common.h | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/core/arch/arm/plat-rcar/drivers/qspi_flash_common.c b/core/arch/arm/plat-rcar/drivers/qspi_flash_common.c
+index fe94d339..e8abf5a2 100644
+--- a/core/arch/arm/plat-rcar/drivers/qspi_flash_common.c
++++ b/core/arch/arm/plat-rcar/drivers/qspi_flash_common.c
+@@ -29,6 +29,7 @@ uint32_t qspi_common_init(struct flash_control_operations *ops)
+ 		switch (read_device_id) {
+ 		/* QSPI_ONBOARD : S25S128S */
+ 		case QSPI_ONBOARD:
++		case QSPI_ONBOARD_IVI:
+ 			qspi_onboard_set_control_ops(ops);
+ 			ret = FL_DRV_OK;
+ 			break;
+diff --git a/core/arch/arm/plat-rcar/drivers/qspi_hyper_flash_common.h b/core/arch/arm/plat-rcar/drivers/qspi_hyper_flash_common.h
+index 0adf0e4e..7d7ed3e1 100644
+--- a/core/arch/arm/plat-rcar/drivers/qspi_hyper_flash_common.h
++++ b/core/arch/arm/plat-rcar/drivers/qspi_hyper_flash_common.h
+@@ -69,6 +69,8 @@
+ /* device id */
+ /* QSPI_ONBOARD : S25FS128S */
+ #define QSPI_ONBOARD 0x00182001U
++/* QSPI_ONBOARD_IVI : S25FS512S */
++#define QSPI_ONBOARD_IVI 0x00200201U
+ /* HyperFlash : S26KS512S */
+ #define HYPER_FLASH 0x007E0001U
+ /* Unsupport device */
+-- 
+2.25.1
+

@@ -1,0 +1,67 @@
+From 21a820ce549784ab0551d24b05fd7ca0bed2a4e6 Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Wed, 10 May 2023 11:03:22 +0800
+Subject: [PATCH 1/2] support DDR16GB.
+
+---
+ arch/arm/dts/r8a7795-salvator-x-u-boot.dts | 34 ++++++++++++++++++++++
+ configs/r8a7795_salvator-x_defconfig       |  1 +
+ 2 files changed, 35 insertions(+)
+
+diff --git a/arch/arm/dts/r8a7795-salvator-x-u-boot.dts b/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
+index a22028bb31..f4943a8c42 100644
+--- a/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
++++ b/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
+@@ -8,6 +8,40 @@
+ #include "r8a7795-salvator-x.dts"
+ #include "r8a7795-u-boot.dtsi"
+ 
++/ {
++	model = "Renesas H3e-2GHz-IVI board based on r8a7795 ES3.0 with 16GiB (4 x 4 GiB)";
++	compatible = "renesas,h3ulcb", "renesas,r8a7795";
++
++	memory@48000000 {
++		device_type = "memory";
++		/* first 128MB is reserved for secure area. */
++		reg = <0x0 0x48000000 0x0 0x78000000>;
++	};
++
++	/* not mirror area */
++	memory@400000000 {
++		device_type = "memory";
++		reg = <0x4 0x80000000 0x0 0x80000000>;
++	};
++
++	memory@500000000 {
++		device_type = "memory";
++		reg = <0x5 0x00000000 0x1 0x00000000>;
++	};
++
++	memory@600000000 {
++		device_type = "memory";
++		reg = <0x6 0x00000000 0x1 0x00000000>;
++	};
++
++	memory@700000000 {
++		device_type = "memory";
++		reg = <0x7 0x00000000 0x1 0x00000000>;
++	};
++	
++
++};
++
+ &vcc_sdhi0 {
+ 	u-boot,off-on-delay-us = <20000>;
+ };
+diff --git a/configs/r8a7795_salvator-x_defconfig b/configs/r8a7795_salvator-x_defconfig
+index 966983f0ec..f9406afe78 100644
+--- a/configs/r8a7795_salvator-x_defconfig
++++ b/configs/r8a7795_salvator-x_defconfig
+@@ -96,3 +96,4 @@ CONFIG_FASTBOOT_BY_SW=y
+ CONFIG_LZ4=y
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_SMBIOS_MANUFACTURER=""
++CONFIG_NR_DRAM_BANKS=5
+-- 
+2.25.1
+

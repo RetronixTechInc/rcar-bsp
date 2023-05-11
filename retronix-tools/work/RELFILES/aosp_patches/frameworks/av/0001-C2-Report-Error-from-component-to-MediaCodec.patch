@@ -1,0 +1,47 @@
+From 8a660459d44e892b82cc70709843ed1fd8898ac6 Mon Sep 17 00:00:00 2001
+From: Ivan Pustovit <ivan.pustovit@globallogic.com>
+Date: Tue, 28 Apr 2020 17:08:38 +0300
+Subject: [PATCH 1/3] C2: Report Error from component to MediaCodec
+
+Implemented onError in CCodec to callback to mediacodec.
+This fixes cases when error occured in c2 vendor component
+and not properly handled.
+
+Jira-Id: ADM-4232
+Signed-off-by: Ivan Pustovit <ivan.pustovit@globallogic.com>
+Change-Id: I36d61a3c84b07becacebfae5a43f4177b5a67fbe
+---
+ media/codec2/sfplugin/CCodec.cpp | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/media/codec2/sfplugin/CCodec.cpp b/media/codec2/sfplugin/CCodec.cpp
+index 78ddd6d569..c8d294e4db 100644
+--- a/media/codec2/sfplugin/CCodec.cpp
++++ b/media/codec2/sfplugin/CCodec.cpp
+@@ -489,9 +489,20 @@ struct CCodec::ClientListener : public Codec2Client::Listener {
+     virtual void onError(
+             const std::weak_ptr<Codec2Client::Component>& component,
+             uint32_t errorCode) override {
+-        // TODO
+-        (void)component;
+-        (void)errorCode;
++
++        std::shared_ptr<Codec2Client::Component> comp = component.lock();
++        if (!comp) {
++            ALOGE("Codec2 component reported error \"%s\".", asString(static_cast<c2_status_t>(errorCode)));
++        } else {
++            ALOGE("Codec2 component \"%s\" reported error \"%s\".", comp->getName().c_str(), asString(static_cast<c2_status_t>(errorCode)));
++        }
++
++        // Report to MediaCodec.
++        sp<CCodec> codec(mCodec.promote());
++        if (!codec || !codec->mCallback) {
++            return;
++        }
++        codec->mCallback->onError(toStatusT(static_cast<c2_status_t>(errorCode), C2_OPERATION_NONE), ACTION_CODE_FATAL);
+     }
+ 
+     virtual void onDeath(
+-- 
+2.28.0
+

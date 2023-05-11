@@ -1,0 +1,72 @@
+From 11d8058e378a39d9f6fe38209932ed9f2e0782bc Mon Sep 17 00:00:00 2001
+From: Artem Radchenko <artem.radchenko@globallogic.com>
+Date: Thu, 26 Mar 2020 13:12:40 +0200
+Subject: [PATCH 1/2] Disabled ActivityView in CarLauncher by default
+
+With this fix car_launcher_multiwindow.xml will be used.
+ActivityView will not be launched.
+Fixes tests from CtsWindowManagerDeviceTestCases.
+
+To enable ActivityView, add to bootargs:
+androidboot.carlauncher.activityview=true
+
+JiraId: ADM-4275
+Signed-off-by: Artem Radchenko <artem.radchenko@globallogic.com>
+Change-Id: I2b049695e0637062eaaa7b6213b43e675ae1f0a1
+---
+ src/com/android/car/carlauncher/CarLauncher.java | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/src/com/android/car/carlauncher/CarLauncher.java b/src/com/android/car/carlauncher/CarLauncher.java
+index 5108215..9476e8a 100644
+--- a/src/com/android/car/carlauncher/CarLauncher.java
++++ b/src/com/android/car/carlauncher/CarLauncher.java
+@@ -25,6 +25,7 @@ import android.content.res.Configuration;
+ import android.os.Bundle;
+ import android.os.IRemoteCallback;
+ import android.os.RemoteException;
++import android.os.SystemProperties;
+ import android.util.Log;
+ import android.widget.FrameLayout;
+ 
+@@ -56,8 +57,12 @@ import java.util.Set;
+ public class CarLauncher extends FragmentActivity {
+     private static final String TAG = "CarLauncher";
+     private static final boolean DEBUG = false;
++    private static final String RO_BOOT_CARLAUNCHER_ACTIVITYVIEW =
++            "ro.boot.carlauncher.activityview";
++    private static final boolean DEFAULT_RO_BOOT_CARLAUNCHER_ACTIVITYVIEW = false;
+ 
+     private ActivityView mActivityView;
++    private boolean mActivityViewEnabled;
+     private boolean mActivityViewReady;
+     private boolean mIsStarted;
+ 
+@@ -101,10 +106,13 @@ public class CarLauncher extends FragmentActivity {
+     @Override
+     protected void onCreate(Bundle savedInstanceState) {
+         super.onCreate(savedInstanceState);
++        mActivityViewEnabled = SystemProperties.getBoolean(RO_BOOT_CARLAUNCHER_ACTIVITYVIEW,
++            DEFAULT_RO_BOOT_CARLAUNCHER_ACTIVITYVIEW);
++        if (DEBUG) Log.d(TAG, "ActivityViewEnabled = " + mActivityViewEnabled);
+         // Don't show the maps panel in multi window mode.
+         // NOTE: CTS tests for split screen are not compatible with activity views on the default
+         // activity of the launcher
+-        if (isInMultiWindowMode() || isInPictureInPictureMode()) {
++        if (!mActivityViewEnabled || isInMultiWindowMode() || isInPictureInPictureMode()) {
+             setContentView(R.layout.car_launcher_multiwindow);
+         } else {
+             setContentView(R.layout.car_launcher);
+@@ -155,7 +163,8 @@ public class CarLauncher extends FragmentActivity {
+     private void startMapsInActivityView() {
+         // If we happen to be be resurfaced into a multi display mode we skip launching content
+         // in the activity view as we will get recreated anyway.
+-        if (!mActivityViewReady || isInMultiWindowMode() || isInPictureInPictureMode()) {
++        if (!mActivityViewEnabled || !mActivityViewReady
++                || isInMultiWindowMode() || isInPictureInPictureMode()) {
+             return;
+         }
+         if (mActivityView != null) {
+-- 
+2.28.0
+

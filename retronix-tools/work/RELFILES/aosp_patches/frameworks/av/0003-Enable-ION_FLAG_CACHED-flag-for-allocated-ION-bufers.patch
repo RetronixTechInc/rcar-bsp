@@ -1,0 +1,50 @@
+From 58f456cf8c4398035f42f4c25f211bb87b052579 Mon Sep 17 00:00:00 2001
+From: Oleksandr Bobro <oleksandr.bobro@globallogic.com>
+Date: Mon, 1 Jun 2020 19:56:35 +0300
+Subject: [PATCH 3/3] Enable ION_FLAG_CACHED flag for allocated ION bufers
+
+Enable the ION_FLAG_CACHED flag for allocated ION bufers. It is required
+because the read/write operations from/to ION buffers are executed by
+CPU from different threads, and the enabling of this flag allows
+to keep a cache coherency and avoids a data corruption in the buffers.
+The patch applying leads to all tests of the VtsHalMediaC2V1_0Host
+module are passed successfully.
+
+Test: run vts -m VtsHalMediaC2V1_0Host
+
+Jira-Id: ADM-4113
+Change-Id(AOSP): Ic855884c19d3c5ffeffe588f58a245aa785bfb83
+Change-Id: I680964c23aa9254020c0824e6099b7a5c41b3bf0
+
+Signed-off-by: Oleksandr Bobro <oleksandr.bobro@globallogic.com>
+Signed-off-by: Oleksandr Shaposhnikov <o.shaposhnikov@globallogic.com>
+Change-Id: I794b89ab1278c6c1f9c21576b382c57e76c85292
+---
+ media/codec2/vndk/C2Store.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/media/codec2/vndk/C2Store.cpp b/media/codec2/vndk/C2Store.cpp
+index 5b2bd7b62f..6bb3c06567 100644
+--- a/media/codec2/vndk/C2Store.cpp
++++ b/media/codec2/vndk/C2Store.cpp
+@@ -28,6 +28,7 @@
+ #include <C2PlatformSupport.h>
+ #include <util/C2InterfaceHelper.h>
+ 
++#include <ion/ion.h>
+ #include <dlfcn.h>
+ #include <unistd.h> // getpagesize
+ 
+@@ -174,6 +175,9 @@ void UseComponentStoreForIonAllocator(
+                 *align = usageInfo.minAlignment;
+                 *heapMask = usageInfo.heapMask;
+                 *flags = usageInfo.allocFlags;
++                if (usageInfo.usage & (C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE)) {
++                    *flags |=  ION_FLAG_CACHED; // cache CPU accessed buffers
++                }
+             }
+             return res;
+         };
+-- 
+2.28.0
+

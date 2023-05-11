@@ -1,0 +1,42 @@
+From 785e4c05fa93ed4a39197f96d778f37d46307912 Mon Sep 17 00:00:00 2001
+From: Oleh Cherpak <oleh.cherpak@globallogic.com>
+Date: Mon, 23 Dec 2019 15:22:09 +0200
+Subject: [PATCH] Android.mk: Change the way of picking a libwifi-hal
+ implementation
+
+Jira-Id: ADM-4305
+
+Signed-off-by: Oleh Cherpak <oleh.cherpak@globallogic.com>
+(cherry picked from commit 7adf7b117b2fbd707d20dec83024d2470195ebb7)
+Change-Id: I4173d538cf4fb8d4fe9533eef4c46d045790ad03
+---
+ libwifi_hal/Android.mk | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/libwifi_hal/Android.mk b/libwifi_hal/Android.mk
+index 4e2232fb4..ea1c22aa6 100644
+--- a/libwifi_hal/Android.mk
++++ b/libwifi_hal/Android.mk
+@@ -87,8 +87,8 @@ include $(BUILD_STATIC_LIBRARY)
+ # ============================================================
+ LIB_WIFI_HAL := libwifi-hal-fallback
+ VENDOR_LOCAL_SHARED_LIBRARIES :=
+-ifeq ($(BOARD_WLAN_DEVICE), bcmdhd)
+-  LIB_WIFI_HAL := libwifi-hal-bcm
++ifeq ($(BOARD_WLAN_DEVICE), )
++  LIB_WIFI_HAL := libwifi-hal-fallback
+ else ifeq ($(BOARD_WLAN_DEVICE), qcwcn)
+   LIB_WIFI_HAL := libwifi-hal-qcom
+   VENDOR_LOCAL_SHARED_LIBRARIES := libcld80211
+@@ -104,6 +104,8 @@ else ifeq ($(BOARD_WLAN_DEVICE), rtl)
+   LIB_WIFI_HAL := libwifi-hal-rtl
+ else ifeq ($(BOARD_WLAN_DEVICE), emulator)
+   LIB_WIFI_HAL := libwifi-hal-emu
++else
++  LIB_WIFI_HAL := libwifi-hal-$(BOARD_WLAN_DEVICE)
+ endif
+ 
+ # The WiFi HAL that you should be linking.
+-- 
+2.28.0
+

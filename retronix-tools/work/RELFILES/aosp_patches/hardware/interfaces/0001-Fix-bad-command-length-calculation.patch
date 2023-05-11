@@ -1,0 +1,89 @@
+From 4948196b4ac89fa41e66ce7155d543c51c8f0e3b Mon Sep 17 00:00:00 2001
+From: "o.v.yevtushenko" <o.v.yevtushenko@globallogic.com>
+Date: Fri, 16 Aug 2019 11:53:56 +0300
+Subject: [PATCH] Fix bad command length calculation
+
+SET_LAYER_PER_FRAME_METADATA_BLOBS command length
+was calculated wrong. With wrong length
+it's impossible to read current and any next commands right.
+
+Explanations:
+/*
+ *  Lets check how much data setLayerPerFrameMetadataBlobs
+ *  method writes.
+ *
+ *  commandLength variable indicates
+ *  length of written data in units of int32_t
+ *
+ *  Suppose we want to write 2 metadata blobs, so
+ *  metadata.size() == 2
+ *
+ *  methods write() and writeSigned() write 1 int32_t
+ *
+ *  metadataBlob.blob is a hidl_vec<uint8_t>
+ *  suppose every metadataBlob.blob.size() == 4
+ *  so method writeBlob() writes 1 int32_t
+ *  (4 uint8_t is 1 int32_t) every cycle.
+ */
+
+    // initialy commandLength = 0
+
+    // write 1 uint32_t so +1 to commandLength
+    write(static_cast<uint32_t>(metadata.size()));
+
+    // don't forget metadata.size() == 2
+    for (auto metadataBlob : metadata) {
+        // write 1 int32_t so +1 to commandLength
+        writeSigned(static_cast<int32_t>(metadataBlob.key));
+
+        // write 1 int32_t so +1 to commandLength
+        write(static_cast<uint32_t>(metadataBlob.blob.size()));
+
+        // +1 to commandLength (explanations at top comment)
+        writeBlob(static_cast<uint32_t>(metadataBlob.blob.size()),
+                  metadataBlob.blob.data());
+    }
+
+    // at this point we have written 7 int32_t so commandLength
+    // must be 7. Without this patch commandLength would be 14,
+    // that doesn't equal to real sent data length.
+
+Jira-ID: ADM-3636
+Change-ID: I36d5b94d8eb104947a5c9c97049f7259e7385ce4
+Signed-off-by: o.v.yevtushenko <o.v.yevtushenko@globallogic.com>
+---
+ .../composer-command-buffer/2.3/ComposerCommandBuffer.h  | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/graphics/composer/2.3/utils/command-buffer/include/composer-command-buffer/2.3/ComposerCommandBuffer.h b/graphics/composer/2.3/utils/command-buffer/include/composer-command-buffer/2.3/ComposerCommandBuffer.h
+index 11863face..d996bae88 100644
+--- a/graphics/composer/2.3/utils/command-buffer/include/composer-command-buffer/2.3/ComposerCommandBuffer.h
++++ b/graphics/composer/2.3/utils/command-buffer/include/composer-command-buffer/2.3/ComposerCommandBuffer.h
+@@ -79,6 +79,7 @@ class CommandWriterBase : public V2_2::CommandWriterBase {
+ 
+     void setLayerPerFrameMetadataBlobs(
+         const hidl_vec<IComposerClient::PerFrameMetadataBlob>& metadata) {
++        // in units of uint32_t's
+         size_t commandLength = 0;
+ 
+         if (metadata.size() > std::numeric_limits<uint32_t>::max()) {
+@@ -86,12 +87,12 @@ class CommandWriterBase : public V2_2::CommandWriterBase {
+             return;
+         }
+ 
+-        // number of blobs
+-        commandLength += metadata.size();
++        // space for numElements
++        commandLength += 1;
+ 
+         for (auto metadataBlob : metadata) {
+-            commandLength += sizeof(int32_t);  // key of metadata blob
+-            commandLength += 1;                // size information of metadata blob
++            commandLength += 1; // key of metadata blob
++            commandLength += 1; // size information of metadata blob
+ 
+             // metadata content size
+             size_t metadataSize = metadataBlob.blob.size() / sizeof(uint32_t);
+-- 
+2.28.0
+

@@ -1,0 +1,32 @@
+From 7f38e004f3fb93ca24de1fb5f71cdd80b16b3638 Mon Sep 17 00:00:00 2001
+From: Artem Radchenko <artem.radchenko@globallogic.com>
+Date: Tue, 19 May 2020 17:33:42 +0300
+Subject: [PATCH 06/12] Don't show volume dialog on init
+
+This prevents crash, when volume dialog is shown
+before volume items are initialized.
+
+JiraId: ADM-4731, ADM-4796
+Signed-off-by: Artem Radchenko <artem.radchenko@globallogic.com>
+Change-Id: Ifb94db51d275978e164a8f06a17dc6f918f44d09
+---
+ .../com/android/systemui/volume/CarVolumeDialogComponent.java  | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/packages/CarSystemUI/src/com/android/systemui/volume/CarVolumeDialogComponent.java b/packages/CarSystemUI/src/com/android/systemui/volume/CarVolumeDialogComponent.java
+index aa78b960428..4bddd4bcf2b 100644
+--- a/packages/CarSystemUI/src/com/android/systemui/volume/CarVolumeDialogComponent.java
++++ b/packages/CarSystemUI/src/com/android/systemui/volume/CarVolumeDialogComponent.java
+@@ -32,9 +32,6 @@ public class CarVolumeDialogComponent extends VolumeDialogComponent {
+ 
+     protected VolumeDialog createDefault() {
+         CarVolumeDialogImpl carVolumeDialog = new CarVolumeDialogImpl(mContext);
+-        // Since VolumeUI is initialized when the first Volume Up/Down event is received we need to
+-        // show the dialog on initialization too.
+-        carVolumeDialog.show(Events.SHOW_REASON_VOLUME_CHANGED);
+         return carVolumeDialog;
+     }
+ }
+-- 
+2.28.0
+

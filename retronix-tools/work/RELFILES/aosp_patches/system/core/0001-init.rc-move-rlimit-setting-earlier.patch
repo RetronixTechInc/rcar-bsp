@@ -1,0 +1,52 @@
+From edade42d33fd9eeab23e1ca676a1d265e25eccb8 Mon Sep 17 00:00:00 2001
+From: Tom Cherry <tomcherry@google.com>
+Date: Thu, 6 Jun 2019 11:05:52 -0700
+Subject: [PATCH] init.rc: move rlimit setting earlier
+
+There is no reason that rlimits cannot be set earlier than they are,
+and apexd-bootstrap may want to set the priority service option, which
+would require that these rlimits have been set, so we move these to
+the beginning of early-init.
+
+Jira-Id: ADM-3599
+Bug: 134668377
+Test: apexd-bootstrap can set the priorty service option
+Signed-off-by: Oleh Cherpak <oleh.cherpak@globallogic.com>
+Change-Id: I56fb64861c08f4b8df5d42b9bb7ce2d65b700310
+---
+ rootdir/init.rc | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/rootdir/init.rc b/rootdir/init.rc
+index e898d4dc9..0e70786f9 100644
+--- a/rootdir/init.rc
++++ b/rootdir/init.rc
+@@ -32,6 +32,12 @@ on early-init
+     # cgroup for system_server and surfaceflinger
+     mkdir /dev/memcg/system 0550 system system
+ 
++    # set RLIMIT_NICE to allow priorities from 19 to -20
++    setrlimit nice 40 40
++
++    # Allow up to 32K FDs per process
++    setrlimit nofile 32768 32768
++
+     start ueventd
+ 
+     # Run apexd-bootstrap so that APEXes that provide critical libraries
+@@ -267,12 +273,6 @@ on init
+ 
+     export DOWNLOAD_CACHE /data/cache
+ 
+-    # set RLIMIT_NICE to allow priorities from 19 to -20
+-    setrlimit nice 40 40
+-
+-    # Allow up to 32K FDs per process
+-    setrlimit nofile 32768 32768
+-
+     # This allows the ledtrig-transient properties to be created here so
+     # that they can be chown'd to system:system later on boot
+     write /sys/class/leds/vibrator/trigger "transient"
+-- 
+2.28.0
+
