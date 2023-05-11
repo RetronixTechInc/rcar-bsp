@@ -31,7 +31,7 @@ function patch_loop
 
 for patch in ${patch_all}; do
 #~ echo "patch = ${patch}"
-	if [ -d ${patch} ]; then
+	if [ -d "${patch_path}/${patch}" ]; then
 		patch_loop ${patch_path} "" ${patch}
 	fi
 done
