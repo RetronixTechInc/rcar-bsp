@@ -1,7 +1,7 @@
-From 21a820ce549784ab0551d24b05fd7ca0bed2a4e6 Mon Sep 17 00:00:00 2001
+From 4fe2902731f173afa4f82aa6168a9db09af73c85 Mon Sep 17 00:00:00 2001
 From: TomWang <townwang@retronix.com.tw>
 Date: Wed, 10 May 2023 11:03:22 +0800
-Subject: [PATCH 1/2] support DDR16GB.
+Subject: [PATCH 1/6] support DDR16GB.
 
 ---
  arch/arm/dts/r8a7795-salvator-x-u-boot.dts | 34 ++++++++++++++++++++++

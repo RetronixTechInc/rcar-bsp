@@ -1,0 +1,85 @@
+From 25a6c9fc2d302df55a7ba0e557625d0c1793f5b1 Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Wed, 7 Jun 2023 17:02:43 +0800
+Subject: [PATCH 6/6] delete CONFIG_FASTBOOT_BY_SW. dtb overlay rename to
+ rtx0-ivi-10/rtx0-v1/rcar-ivi.
+
+---
+ arch/arm/dts/r8a7795-salvator-x-u-boot.dts | 3 ++-
+ configs/r8a7795_salvator-x_defconfig       | 1 -
+ include/device-tree-common.h               | 6 +++---
+ include/init.h                             | 2 +-
+ 4 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/dts/r8a7795-salvator-x-u-boot.dts b/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
+index d954e07b27..50a9cb8a66 100644
+--- a/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
++++ b/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
+@@ -281,12 +281,13 @@
+ 		clock-frequency = <25000000>;
+ 	};
+ 
++/* tom
+ 	fastboot-by-sw {
+ 		compatible = "fastboot-by-sw";
+ 		gpios = <&gpio6 13 GPIO_ACTIVE_LOW>;
+ 		label = "SW22";
+ 	};
+-
++*/
+ 	android {
+ 		partitions_oneslot {
+ 			misc {
+diff --git a/configs/r8a7795_salvator-x_defconfig b/configs/r8a7795_salvator-x_defconfig
+index f9406afe78..8fb8ebf560 100644
+--- a/configs/r8a7795_salvator-x_defconfig
++++ b/configs/r8a7795_salvator-x_defconfig
+@@ -92,7 +92,6 @@ CONFIG_CMD_FASTBOOT=y
+ CONFIG_LIBAVB=y
+ CONFIG_LIBAVB_AB=y
+ CONFIG_LIBAVB_SHA256_V8_EXT=y
+-CONFIG_FASTBOOT_BY_SW=y
+ CONFIG_LZ4=y
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_SMBIOS_MANUFACTURER=""
+diff --git a/include/device-tree-common.h b/include/device-tree-common.h
+index b29b8a8464..d3a567ad72 100644
+--- a/include/device-tree-common.h
++++ b/include/device-tree-common.h
+@@ -28,16 +28,16 @@
+ #define H3v3_PLAT_ID			0x0b779530
+ #define H3v2_PLAT_ID			0x0b779520
+ #elif defined(CONFIG_TARGET_SALVATOR_X)
+-#define	V3_PLATID_DTBO_NAME		"salv-4x2g-30"
++#define	V3_PLATID_DTBO_NAME		"rtx0-ivi-10"
+ #define	V2_PLATID_DTBO_NAME		"salv-4x2g-20"
+-#define	V3_INFO_DTBO_NAME		"salv-v3"
++#define	V3_INFO_DTBO_NAME		"rtx0-v1"
+ #define	V2_INFO_DTBO_NAME		"salv-v2"
+ #define H3v3_PLAT_ID			0x04779530
+ #define H3v2_PLAT_ID			0x04779520
+ #endif
+ #endif
+ 
+-#define AVB_DTBO_NAME			"rcar-avb"
++#define AVB_DTBO_NAME			"rcar-ivi"
+ 
+ #if defined(CONFIG_TARGET_ULCB)
+ #define	ADSP_SKKF_DTBO_NAME		"skkf-adsp"
+diff --git a/include/init.h b/include/init.h
+index 9a54b3cd64..254c12ad37 100644
+--- a/include/init.h
++++ b/include/init.h
+@@ -178,8 +178,8 @@ int init_func_vid(void);
+ int checkboard(void);
+ int show_board_info(void);
+ 
+-#if defined(CONFIG_FASTBOOT_BY_SW)
+ #include <asm/gpio.h>
++#if defined(CONFIG_FASTBOOT_BY_SW)
+ struct confirm_pin_info {
+ 	struct gpio_desc gpio;
+ 	const char *name;
+-- 
+2.25.1
+

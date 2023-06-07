@@ -1,7 +1,7 @@
-From 29b79dc8119ede1fa5d4a859e2fa0f945a0b81b6 Mon Sep 17 00:00:00 2001
+From 4a810ecd78dd64e44ce53150ca275dfb88b3d16b Mon Sep 17 00:00:00 2001
 From: TomWang <townwang@retronix.com.tw>
 Date: Wed, 10 May 2023 14:55:55 +0800
-Subject: [PATCH] fixed plat_id is H3v3_PLAT_ID(0x04779530)
+Subject: [PATCH 3/6] fixed plat_id is H3v3_PLAT_ID(0x04779530)
 
 ---
  common/device-tree-common.c | 10 ++++++----

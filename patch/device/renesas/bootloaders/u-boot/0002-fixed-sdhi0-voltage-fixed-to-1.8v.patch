@@ -1,7 +1,7 @@
-From 5dd656f274d1066e0022ca73a0f8b909fb11058d Mon Sep 17 00:00:00 2001
+From 0d9914475f34820150de1669a0b2f97e06168ec5 Mon Sep 17 00:00:00 2001
 From: TomWang <townwang@retronix.com.tw>
 Date: Wed, 10 May 2023 11:03:52 +0800
-Subject: [PATCH 2/2] fixed sdhi0 voltage fixed to 1.8v
+Subject: [PATCH 2/6] fixed sdhi0 voltage fixed to 1.8v
 
 ---
  arch/arm/dts/r8a7795-salvator-x-u-boot.dts | 4 ++++
