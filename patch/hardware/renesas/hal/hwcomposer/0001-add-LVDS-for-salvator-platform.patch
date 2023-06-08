@@ -1,0 +1,39 @@
+From 59fbade30a21599eaa8990db92675d9f635aa5f9 Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Thu, 8 Jun 2023 11:36:05 +0800
+Subject: [PATCH] add LVDS for salvator platform
+
+---
+ config.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/config.h b/config.h
+index d23dca7..920f5ac 100644
+--- a/config.h
++++ b/config.h
+@@ -22,7 +22,7 @@
+  define function switch
+ ***********************************/
+ 
+-#define NUM_DISPLAYS (3)
++#define NUM_DISPLAYS (4)
+ 
+ struct hwdisplay {
+     char encoder[64];
+@@ -62,6 +62,13 @@ static const hwdisplay hwdisplays[NUM_DISPLAYS] = {
+         "/sys/class/drm/card0-VGA-1/connector_id",
+         "/sys/class/drm/card0-VGA-1/status",
+         "ro.boot.display.res.VGA"
++    },
++	{
++        // primary display
++        "/sys/class/drm/card0-LVDS-1/encoder_type",
++        "/sys/class/drm/card0-LVDS-1/connector_id",
++        "/sys/class/drm/card0-LVDS-1/status",
++        "ro.boot.display.res.LVDS",
+     },
+     {
+         // external display 1
+-- 
+2.25.1
+
