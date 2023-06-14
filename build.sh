@@ -63,6 +63,14 @@ cd ${workspace}
 chmod +x walkthrough.sh
 ./walkthrough.sh $(echo ${TARGET_BOARD} | sed 's/salvator//' | tr '[:lower:]' '[:upper:]')
 
+#~ Creae local git
+cd ${workspace}/mydroid/hardware/renesas
+git init .
+git add .
+git commit -a -m "create local git."
+
+cd ${workspace}/mydroid
+
 #~ patch IVI PCBA.
 path_file=${SCRIPT_DIR}/patch/patch.sh
 if [ -f ${path_file} ] && [ -x ${path_file} ]; then
@@ -71,6 +79,7 @@ fi
 
 cd ${workspace}/mydroid
 fi
+
 
 if [[ "${TARGET_BOARD}" == "h3salvator" ]]; then
     export TARGET_BOARD_PLATFORM=r8a7795

@@ -1,0 +1,70 @@
+From b8b40dc382405381c4937405d2153a44a78b0110 Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Tue, 13 Jun 2023 17:28:28 +0800
+Subject: [PATCH 2/2] USB 2.0 CH.3 TypeA Host function for usb command.
+
+---
+ arch/arm/mach-rmobile/include/mach/rcar-gen3-base.h |  5 +++++
+ cmd/usb.c                                           | 10 ++++++++++
+ 2 files changed, 15 insertions(+)
+
+diff --git a/arch/arm/mach-rmobile/include/mach/rcar-gen3-base.h b/arch/arm/mach-rmobile/include/mach/rcar-gen3-base.h
+index ecd02b9be0..9f83d7cf4c 100644
+--- a/arch/arm/mach-rmobile/include/mach/rcar-gen3-base.h
++++ b/arch/arm/mach-rmobile/include/mach/rcar-gen3-base.h
+@@ -68,12 +68,17 @@
+ #define SMSTPCR11		0xE615099C
+ 
+ /* PFC */
++#define GPSR6 0xE6060118
+ #define PFC_PUEN5	0xE6060414
+ #define PUEN_SSI_SDATA4	BIT(17)
+ #define PFC_PUEN6       0xE6060418
+ #define PUEN_USB1_OVC   (1 << 2)
+ #define PUEN_USB1_PWEN  (1 << 1)
+ 
++/* GPIO */
++#define INOUTSEL6 0xE6055404
++#define OUTDT6 0xE6055408
++
+ /* IICDVFS (I2C) */
+ #define CONFIG_SYS_I2C_SH_BASE0	0xE60B0000
+ 
+diff --git a/cmd/usb.c b/cmd/usb.c
+index 0ccb1b5148..bbb32a3447 100644
+--- a/cmd/usb.c
++++ b/cmd/usb.c
+@@ -20,6 +20,7 @@
+ #include <asm/unaligned.h>
+ #include <part.h>
+ #include <usb.h>
++#include <asm/io.h>
+ 
+ #ifdef CONFIG_USB_STORAGE
+ static int usb_stor_curr_dev = -1; /* current device */
+@@ -583,6 +584,11 @@ static void do_usb_start(void)
+ {
+ 	bootstage_mark_name(BOOTSTAGE_ID_USB_START, "usb_start");
+ 
++	/* Tom GPIO Test */
++	clrsetbits_le32(GPSR6, 0x40000000,	0x00000000); //GP6_30 <=> USB2_CH3_PWEN ; GP6_31 <=> USB2_CH3_OVC
++	clrsetbits_le32(INOUTSEL6, 0x40000000, 0x40000000); //GP6_30 is output mode.
++	clrsetbits_le32(OUTDT6, 0x40000000, 0x40000000); //GP6_30 is high.
++
+ 	if (usb_init() < 0)
+ 		return;
+ 
+@@ -662,6 +668,10 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+ 		if (do_usb_stop_keyboard(0) != 0)
+ 			return 1;
+ 		printf("stopping USB..\n");
++		
++		/* Tom USB2CH3 Power off */
++		clrbits_le32(OUTDT6, 0x40000000); //GP6_30 is low.
++
+ 		usb_stop();
+ 		return 0;
+ 	}
+-- 
+2.25.1
+
