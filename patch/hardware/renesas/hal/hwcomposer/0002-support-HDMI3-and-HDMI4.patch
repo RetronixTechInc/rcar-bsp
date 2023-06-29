@@ -1,0 +1,68 @@
+From a4fa62b1cac0ec8d5d7311cd674681bb4f4b146b Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Thu, 29 Jun 2023 15:37:46 +0800
+Subject: [PATCH] support HDMI3 and HDMI4.
+
+---
+ config.h | 34 ++++++++++++++++------------------
+ 1 file changed, 16 insertions(+), 18 deletions(-)
+
+diff --git a/config.h b/config.h
+index 920f5ac..dc473c8 100644
+--- a/config.h
++++ b/config.h
+@@ -57,35 +57,33 @@ static const hwdisplay hwdisplays[NUM_DISPLAYS] = {
+     }
+ #else /* LAGER, KOELSCH, ALT, SALVATOR, ULCB*/
+     {
+-        // primary display
+-        "/sys/class/drm/card0-VGA-1/encoder_type",
+-        "/sys/class/drm/card0-VGA-1/connector_id",
+-        "/sys/class/drm/card0-VGA-1/status",
+-        "ro.boot.display.res.VGA"
+-    },
+-	{
+-        // primary display
+-        "/sys/class/drm/card0-LVDS-1/encoder_type",
+-        "/sys/class/drm/card0-LVDS-1/connector_id",
+-        "/sys/class/drm/card0-LVDS-1/status",
+-        "ro.boot.display.res.LVDS",
+-    },
+-    {
+-        // external display 1
++        // VGA to HDMI
+         "/sys/class/drm/card0-HDMI-A-1/encoder_type",
+         "/sys/class/drm/card0-HDMI-A-1/connector_id",
+         "/sys/class/drm/card0-HDMI-A-1/status",
+         "ro.boot.display.res.HDMI1",
+     },
+-#if defined(TARGET_BOARD_PLATFORM_R8A7795)
+     {
+-        // external display 2
++        // HDMI0
+         "/sys/class/drm/card0-HDMI-A-2/encoder_type",
+         "/sys/class/drm/card0-HDMI-A-2/connector_id",
+         "/sys/class/drm/card0-HDMI-A-2/status",
+         "ro.boot.display.res.HDMI2",
++    },
++	{
++        // HMDI1
++        "/sys/class/drm/card0-HDMI-A-3/encoder_type",
++        "/sys/class/drm/card0-HDMI-A-3/connector_id",
++        "/sys/class/drm/card0-HDMI-A-3/status",
++        "ro.boot.display.res.HDMI3",
++    },
++    {
++        // LVDS to HDMI
++        "/sys/class/drm/card0-HDMI-A-4/encoder_type",
++        "/sys/class/drm/card0-HDMI-A-4/connector_id",
++        "/sys/class/drm/card0-HDMI-A-4/status",
++        "ro.boot.display.res.HDMI4"
+     }
+-#endif
+ #endif /* defined(TARGET_BOARD_KINGFISHER) */
+ };
+ 
+-- 
+2.25.1
+
