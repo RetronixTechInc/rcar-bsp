@@ -1,0 +1,2170 @@
+From eb3fb9af38631c512bbdbd0cba472803272fefda Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Fri, 30 Jun 2023 14:48:09 +0800
+Subject: [PATCH] add it66121 drm bridge
+
+---
+ .../renesas/r8a7795-salvator-xs-android.dts   |   79 +-
+ arch/arm64/configs/android_salvator_defconfig |    1 +
+ drivers/gpu/drm/bridge/Kconfig                |    8 +
+ drivers/gpu/drm/bridge/Makefile               |    1 +
+ drivers/gpu/drm/bridge/it66121.h              |  419 +++++
+ drivers/gpu/drm/bridge/it66121_drv.c          | 1553 +++++++++++++++++
+ 6 files changed, 2022 insertions(+), 39 deletions(-)
+ mode change 100644 => 100755 arch/arm64/configs/android_salvator_defconfig
+ mode change 100644 => 100755 drivers/gpu/drm/bridge/Kconfig
+ mode change 100644 => 100755 drivers/gpu/drm/bridge/Makefile
+ create mode 100755 drivers/gpu/drm/bridge/it66121.h
+ create mode 100755 drivers/gpu/drm/bridge/it66121_drv.c
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+index d86f99f5a1b6..6fc3a59a7f2e 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+@@ -317,41 +317,6 @@
+ 		};
+ 	};
+ 
+-	vga {
+-		compatible = "vga-connector";
+-		no-use-ddc;
+-		max-pixelclock = <100000>;
+-
+-		port {
+-			vga_in: endpoint {
+-				remote-endpoint = <&adv7123_out>;
+-			};
+-		};
+-	};
+-
+-	vga-encoder {
+-		compatible = "adi,adv7123";
+-		adi,clock-max-rate = <100000>;
+-		
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			port@0 {
+-				reg = <0>;
+-				adv7123_in: endpoint {
+-					remote-endpoint = <&du_out_rgb>;
+-				};
+-			};
+-			port@1 {
+-				reg = <1>;
+-				adv7123_out: endpoint {
+-					remote-endpoint = <&vga_in>;
+-				};
+-			};
+-		};
+-	};
+-
+ 	hdmi0-out {
+ 		compatible = "hdmi-connector";
+ 		label = "HDMI0 OUT";
+@@ -376,6 +341,17 @@
+ 		};
+ 	};
+ 
++	hdmi2-out {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi2_con: endpoint {
++				remote-endpoint = <&it66121_out>;
++			};
++		};
++	};
++
+ 	lvds-out {
+ 		compatible = "hdmi-connector";
+ 		label = "HDMI3 OUT";
+@@ -576,7 +552,7 @@
+ 	};
+ 
+ 	du_pins: du {
+-		groups = "du_rgb888", "du_sync", "du_oddf", "du_clk_out_0";
++		groups = "du_rgb888", "du_sync", "du_clk_out_0", "du_disp";
+ 		function = "du";
+ 	};
+ 
+@@ -820,7 +796,7 @@
+ 	ports {
+ 		port@0 {
+ 			endpoint {
+-				remote-endpoint = <&adv7123_in>;
++				remote-endpoint = <&it66121_in>;
+ 			};
+ 		};
+ 	};
+@@ -1171,9 +1147,34 @@
+ 		interrupts = <17 IRQ_TYPE_EDGE_FALLING>;
+ 	};
+ 
+-	U3800: IT66121@4d { /* IT66121 */
+-		compatible = "ite,IT66121";
++	U3800: hdmi@4d {
++		compatible = "ite,it66121";
+ 		reg = <0x4d>;
++
++		interlace-allowed;
++		ite,input-depth = <8>;
++		ite,input-colorspace = "rgb";
++		ite,clock-max-rate = <100000>;
++		bus-width = <24>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port@0 {
++				reg = <0>;
++				it66121_in: endpoint {
++					remote-endpoint = <&du_out_rgb>;
++				};
++			};
++
++			port@1 {
++				reg = <1>;
++				it66121_out: endpoint {
++					remote-endpoint = <&hdmi2_con>;
++				};
++			};
++		};
+ 	};
+ 
+ 	U4100: IT6263@4c { /* IT6263 */
+diff --git a/arch/arm64/configs/android_salvator_defconfig b/arch/arm64/configs/android_salvator_defconfig
+old mode 100644
+new mode 100755
+index d1cc3eca2e20..376c5861d002
+--- a/arch/arm64/configs/android_salvator_defconfig
++++ b/arch/arm64/configs/android_salvator_defconfig
+@@ -393,6 +393,7 @@ CONFIG_DRM_RCAR_LVDS=y
+ CONFIG_DRM_PANEL_LVDS=y
+ CONFIG_DRM_DUMB_VGA_DAC=y
+ CONFIG_DRM_DW_HDMI_CEC=y
++CONFIG_DRM_ITE_IT66121=y
+ CONFIG_DRM_ITE_IT6263=y
+ CONFIG_FB_MODE_HELPERS=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+old mode 100644
+new mode 100755
+index 1ac94acd7373..124a27bda013
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -121,4 +121,12 @@ config DRM_ITE_IT6263
+ 	---help---
+ 	  ITE IT6263 bridge chip driver.
+ 
++config DRM_ITE_IT66121
++	tristate "ITE IT66121 HDMI bridge"
++	depends on OF
++	select DRM_KMS_HELPER
++	select REGMAP_I2C
++	help
++	  Support for ITE IT66121 HDMI bridge.
++
+ endmenu
+diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
+old mode 100644
+new mode 100755
+index 3204bee5aeec..7ead1e718b0d
+--- a/drivers/gpu/drm/bridge/Makefile
++++ b/drivers/gpu/drm/bridge/Makefile
+@@ -14,3 +14,4 @@ obj-$(CONFIG_DRM_I2C_ADV7511) += adv7511/
+ obj-$(CONFIG_DRM_TI_TFP410) += ti-tfp410.o
+ obj-y += synopsys/
+ obj-$(CONFIG_DRM_ITE_IT6263) += it6263.o
++obj-$(CONFIG_DRM_ITE_IT66121) += it66121_drv.o
+\ No newline at end of file
+diff --git a/drivers/gpu/drm/bridge/it66121.h b/drivers/gpu/drm/bridge/it66121.h
+new file mode 100755
+index 000000000000..4b8bc28a414e
+--- /dev/null
++++ b/drivers/gpu/drm/bridge/it66121.h
+@@ -0,0 +1,419 @@
++/* License-Identifier: GPL-2.0 */
++/*
++ * Based on the un-official documentation found on the net and registers
++ * description from source code:
++ *  - it66121 driver
++ *
++ * (C) Copyright 2023, Simon Chiang
++ */
++
++#ifndef __IT66121_H__
++#define __IT66121_H__
++
++#include <linux/version.h>
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/component.h>
++#include <drm/drm_atomic.h>
++#include <drm/drm_bridge.h>
++#include <drm/drm_print.h>
++#include <drm/drm_edid.h>
++#include <drm/drm_atomic_helper.h>
++#include <drm/drm_simple_kms_helper.h>
++//#include <drm/drm_probe_helper.h>
++
++#include <linux/hdmi.h>
++#include <linux/i2c.h>
++#include <linux/regmap.h>
++#include <linux/regulator/consumer.h>
++
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_mipi_dsi.h>
++
++
++#define IT66121_VENDOR_ID0_REG			0x00
++#define IT66121_VENDOR_ID1_REG			0x01
++#define IT66121_DEVICE_ID0_REG			0x02
++#define IT66121_DEVICE_ID1_REG			0x03
++
++#define IT66121_VENDOR_ID0			0x54
++#define IT66121_VENDOR_ID1			0x49
++#define IT66121_DEVICE_ID0			0x12
++#define IT66121_DEVICE_ID1			0x06
++#define IT66121_DEVICE_MASK			0x0F
++#define IT66121_AFE_CLK_HIGH			80000 /* Khz */
++#define IT66121_REVISION_MASK			GENMASK(7, 4)
++#define IT66121_DEVICE_ID1_MASK			GENMASK(3, 0)
++
++#define IT66121_MASTER_SEL_REG			0x10
++#define IT66121_MASTER_SEL_HOST			BIT(0)
++
++#define IT66121_AFE_DRV_REG			0x61
++#define IT66121_AFE_DRV_RST			BIT(4)
++#define IT66121_AFE_DRV_PWD			BIT(5)
++
++#define IT66121_INPUT_MODE_REG			0x70
++#define IT66121_INPUT_MODE_RGB			(0 << 6)
++#define IT66121_INPUT_MODE_YUV422		BIT(6)
++#define IT66121_INPUT_MODE_YUV444		(2 << 6)
++#define IT66121_INPUT_MODE_CCIR656		BIT(4)
++#define IT66121_INPUT_MODE_SYNCEMB		BIT(3)
++#define IT66121_INPUT_MODE_DDR			BIT(2)
++
++#define IT66121_INPUT_CSC_REG			0x72
++#define IT66121_INPUT_CSC_ENDITHER		BIT(7)
++#define IT66121_INPUT_CSC_ENUDFILTER		BIT(6)
++#define IT66121_INPUT_CSC_DNFREE_GO		BIT(5)
++#define IT66121_INPUT_CSC_RGB_TO_YUV		0x02
++#define IT66121_INPUT_CSC_YUV_TO_RGB		0x03
++#define IT66121_INPUT_CSC_NO_CONV		0x00
++
++#define IT66121_AFE_XP_REG			0x62
++#define IT66121_AFE_XP_GAINBIT			BIT(7)
++#define IT66121_AFE_XP_PWDPLL			BIT(6)
++#define IT66121_AFE_XP_ENI			BIT(5)
++#define IT66121_AFE_XP_ENO			BIT(4)
++#define IT66121_AFE_XP_RESETB			BIT(3)
++#define IT66121_AFE_XP_PWDI			BIT(2)
++
++#define IT66121_AFE_IP_REG			0x64
++#define IT66121_AFE_IP_GAINBIT			BIT(7)
++#define IT66121_AFE_IP_PWDPLL			BIT(6)
++#define IT66121_AFE_IP_CKSEL_05			(0 << 4)
++#define IT66121_AFE_IP_CKSEL_1			BIT(4)
++#define IT66121_AFE_IP_CKSEL_2			(2 << 4)
++#define IT66121_AFE_IP_CKSEL_2OR4		(3 << 4)
++#define IT66121_AFE_IP_ER0			BIT(3)
++#define IT66121_AFE_IP_RESETB			BIT(2)
++#define IT66121_AFE_IP_ENC			BIT(1)
++#define IT66121_AFE_IP_EC1			BIT(0)
++
++#define IT66121_AFE_XP_EC1_REG			0x68
++#define IT66121_AFE_XP_EC1_LOWCLK		BIT(4)
++
++#define IT66121_SW_RST_REG			0x04
++#define IT66121_SW_RST_REF			BIT(5)
++#define IT66121_SW_RST_AREF			BIT(4)
++#define IT66121_SW_RST_VID			BIT(3)
++#define IT66121_SW_RST_AUD			BIT(2)
++#define IT66121_SW_RST_HDCP			BIT(0)
++
++#define IT66121_DDC_COMMAND_REG			0x15
++#define IT66121_DDC_COMMAND_BURST_READ		0x0
++#define IT66121_DDC_COMMAND_EDID_READ		0x3
++#define IT66121_DDC_COMMAND_FIFO_CLR		0x9
++#define IT66121_DDC_COMMAND_SCL_PULSE		0xA
++#define IT66121_DDC_COMMAND_ABORT		0xF
++
++#define IT66121_HDCP_REG			0x20
++#define IT66121_HDCP_CPDESIRED			BIT(0)
++#define IT66121_HDCP_EN1P1FEAT			BIT(1)
++
++#define IT66121_INT_STATUS1_REG			0x06
++#define IT66121_INT_STATUS1_AUD_OVF		BIT(7)
++#define IT66121_INT_STATUS1_DDC_NOACK		BIT(5)
++#define IT66121_INT_STATUS1_DDC_FIFOERR		BIT(4)
++#define IT66121_INT_STATUS1_DDC_BUSHANG		BIT(2)
++#define IT66121_INT_STATUS1_RX_SENS_STATUS	BIT(1)
++#define IT66121_INT_STATUS1_HPD_STATUS		BIT(0)
++
++#define IT66121_DDC_HEADER_REG			0x11
++#define IT66121_DDC_HEADER_HDCP			0x74
++#define IT66121_DDC_HEADER_EDID			0xA0
++
++#define IT66121_DDC_OFFSET_REG			0x12
++#define IT66121_DDC_BYTE_REG			0x13
++#define IT66121_DDC_SEGMENT_REG			0x14
++#define IT66121_DDC_RD_FIFO_REG			0x17
++
++#define IT66121_CLK_BANK_REG			0x0F
++#define IT66121_CLK_BANK_PWROFF_RCLK		BIT(6)
++#define IT66121_CLK_BANK_PWROFF_ACLK		BIT(5)
++#define IT66121_CLK_BANK_PWROFF_TXCLK		BIT(4)
++#define IT66121_CLK_BANK_PWROFF_CRCLK		BIT(3)
++#define IT66121_CLK_BANK_0			0
++#define IT66121_CLK_BANK_1			1
++
++#define IT66121_INT_REG				0x05
++#define IT66121_INT_ACTIVE_HIGH			BIT(7)
++#define IT66121_INT_OPEN_DRAIN			BIT(6)
++#define IT66121_INT_TX_CLK_OFF			BIT(0)
++
++#define IT66121_INT_MASK1_REG			0x09
++#define IT66121_INT_MASK1_AUD_OVF		BIT(7)
++#define IT66121_INT_MASK1_DDC_NOACK		BIT(5)
++#define IT66121_INT_MASK1_DDC_FIFOERR		BIT(4)
++#define IT66121_INT_MASK1_DDC_BUSHANG		BIT(2)
++#define IT66121_INT_MASK1_RX_SENS		BIT(1)
++#define IT66121_INT_MASK1_HPD			BIT(0)
++
++#define IT66121_INT_CLR1_REG			0x0C
++#define IT66121_INT_CLR1_PKTACP			BIT(7)
++#define IT66121_INT_CLR1_PKTNULL		BIT(6)
++#define IT66121_INT_CLR1_PKTGEN			BIT(5)
++#define IT66121_INT_CLR1_KSVLISTCHK		BIT(4)
++#define IT66121_INT_CLR1_AUTHDONE		BIT(3)
++#define IT66121_INT_CLR1_AUTHFAIL		BIT(2)
++#define IT66121_INT_CLR1_RX_SENS		BIT(1)
++#define IT66121_INT_CLR1_HPD			BIT(0)
++
++#define IT66121_AV_MUTE_REG			0xC1
++#define IT66121_AV_MUTE_ON			BIT(0)
++#define IT66121_AV_MUTE_BLUESCR			BIT(1)
++
++#define IT66121_PKT_CTS_CTRL_REG		0xC5
++#define IT66121_PKT_CTS_CTRL_SEL		BIT(1)
++
++#define IT66121_PKT_GEN_CTRL_REG		0xC6
++#define IT66121_PKT_GEN_CTRL_ON			BIT(0)
++#define IT66121_PKT_GEN_CTRL_RPT		BIT(1)
++
++#define IT66121_AVIINFO_DB1_REG			0x158
++#define IT66121_AVIINFO_DB2_REG			0x159
++#define IT66121_AVIINFO_DB3_REG			0x15A
++#define IT66121_AVIINFO_DB4_REG			0x15B
++#define IT66121_AVIINFO_DB5_REG			0x15C
++#define IT66121_AVIINFO_CSUM_REG		0x15D
++#define IT66121_AVIINFO_DB6_REG			0x15E
++#define IT66121_AVIINFO_DB7_REG			0x15F
++#define IT66121_AVIINFO_DB8_REG			0x160
++#define IT66121_AVIINFO_DB9_REG			0x161
++#define IT66121_AVIINFO_DB10_REG		0x162
++#define IT66121_AVIINFO_DB11_REG		0x163
++#define IT66121_AVIINFO_DB12_REG		0x164
++#define IT66121_AVIINFO_DB13_REG		0x165
++
++#define IT66121_AVI_INFO_PKT_REG		0xCD
++#define IT66121_AVI_INFO_PKT_ON			BIT(0)
++#define IT66121_AVI_INFO_PKT_RPT		BIT(1)
++
++#define IT66121_HDMI_MODE_REG			0xC0
++#define IT66121_HDMI_MODE_HDMI			BIT(0)
++
++#define IT66121_SYS_STATUS_REG			0x0E
++#define IT66121_SYS_STATUS_ACTIVE_IRQ		BIT(7)
++#define IT66121_SYS_STATUS_HPDETECT		BIT(6)
++#define IT66121_SYS_STATUS_SENDECTECT		BIT(5)
++#define IT66121_SYS_STATUS_VID_STABLE		BIT(4)
++#define IT66121_SYS_STATUS_AUD_CTS_CLR		BIT(1)
++#define IT66121_SYS_STATUS_CLEAR_IRQ		BIT(0)
++
++#define IT66121_DDC_STATUS_REG			0x16
++#define IT66121_DDC_STATUS_TX_DONE		BIT(7)
++#define IT66121_DDC_STATUS_ACTIVE		BIT(6)
++#define IT66121_DDC_STATUS_NOACK		BIT(5)
++#define IT66121_DDC_STATUS_WAIT_BUS		BIT(4)
++#define IT66121_DDC_STATUS_ARBI_LOSE		BIT(3)
++#define IT66121_DDC_STATUS_FIFO_FULL		BIT(2)
++#define IT66121_DDC_STATUS_FIFO_EMPTY		BIT(1)
++#define IT66121_DDC_STATUS_FIFO_VALID		BIT(0)
++
++#define IT66121_EDID_SLEEP_US			20000
++#define IT66121_EDID_TIMEOUT_US			200000
++#define IT66121_EDID_FIFO_SIZE			32
++
++#define IT66121_CLK_CTRL0_REG			0x58
++#define IT66121_CLK_CTRL0_AUTO_OVER_SAMPLING	BIT(4)
++#define IT66121_CLK_CTRL0_EXT_MCLK_MASK		GENMASK(3, 2)
++#define IT66121_CLK_CTRL0_EXT_MCLK_128FS	(0 << 2)
++#define IT66121_CLK_CTRL0_EXT_MCLK_256FS	BIT(2)
++#define IT66121_CLK_CTRL0_EXT_MCLK_512FS	(2 << 2)
++#define IT66121_CLK_CTRL0_EXT_MCLK_1024FS	(3 << 2)
++#define IT66121_CLK_CTRL0_AUTO_IPCLK		BIT(0)
++#define IT66121_CLK_STATUS1_REG			0x5E
++#define IT66121_CLK_STATUS2_REG			0x5F
++
++#define IT66121_AUD_CTRL0_REG			0xE0
++#define IT66121_AUD_SWL				(3 << 6)
++#define IT66121_AUD_16BIT			(0 << 6)
++#define IT66121_AUD_18BIT			BIT(6)
++#define IT66121_AUD_20BIT			(2 << 6)
++#define IT66121_AUD_24BIT			(3 << 6)
++#define IT66121_AUD_SPDIFTC			BIT(5)
++#define IT66121_AUD_SPDIF			BIT(4)
++#define IT66121_AUD_I2S				(0 << 4)
++#define IT66121_AUD_EN_I2S3			BIT(3)
++#define IT66121_AUD_EN_I2S2			BIT(2)
++#define IT66121_AUD_EN_I2S1			BIT(1)
++#define IT66121_AUD_EN_I2S0			BIT(0)
++#define IT66121_AUD_CTRL0_AUD_SEL		BIT(4)
++
++#define IT66121_AUD_CTRL1_REG			0xE1
++#define IT66121_AUD_FIFOMAP_REG			0xE2
++#define IT66121_AUD_CTRL3_REG			0xE3
++#define IT66121_AUD_SRCVALID_FLAT_REG		0xE4
++#define IT66121_AUD_FLAT_SRC0			BIT(4)
++#define IT66121_AUD_FLAT_SRC1			BIT(5)
++#define IT66121_AUD_FLAT_SRC2			BIT(6)
++#define IT66121_AUD_FLAT_SRC3			BIT(7)
++#define IT66121_AUD_HDAUDIO_REG			0xE5
++
++#define IT66121_AUD_PKT_CTS0_REG		0x130
++#define IT66121_AUD_PKT_CTS1_REG		0x131
++#define IT66121_AUD_PKT_CTS2_REG		0x132
++#define IT66121_AUD_PKT_N0_REG			0x133
++#define IT66121_AUD_PKT_N1_REG			0x134
++#define IT66121_AUD_PKT_N2_REG			0x135
++
++#define IT66121_AUD_CHST_MODE_REG		0x191
++#define IT66121_AUD_CHST_CAT_REG		0x192
++#define IT66121_AUD_CHST_SRCNUM_REG		0x193
++#define IT66121_AUD_CHST_CHTNUM_REG		0x194
++#define IT66121_AUD_CHST_CA_FS_REG		0x198
++#define IT66121_AUD_CHST_OFS_WL_REG		0x199
++
++#define IT66121_AUD_PKT_CTS_CNT0_REG		0x1A0
++#define IT66121_AUD_PKT_CTS_CNT1_REG		0x1A1
++#define IT66121_AUD_PKT_CTS_CNT2_REG		0x1A2
++
++#define IT66121_AUD_FS_22P05K			0x4
++#define IT66121_AUD_FS_44P1K			0x0
++#define IT66121_AUD_FS_88P2K			0x8
++#define IT66121_AUD_FS_176P4K			0xC
++#define IT66121_AUD_FS_24K			0x6
++#define IT66121_AUD_FS_48K			0x2
++#define IT66121_AUD_FS_96K			0xA
++#define IT66121_AUD_FS_192K			0xE
++#define IT66121_AUD_FS_768K			0x9
++#define IT66121_AUD_FS_32K			0x3
++#define IT66121_AUD_FS_OTHER			0x1
++
++#define IT66121_AUD_SWL_21BIT			0xD
++#define IT66121_AUD_SWL_24BIT			0xB
++#define IT66121_AUD_SWL_23BIT			0x9
++#define IT66121_AUD_SWL_22BIT			0x5
++#define IT66121_AUD_SWL_20BIT			0x3
++#define IT66121_AUD_SWL_17BIT			0xC
++#define IT66121_AUD_SWL_19BIT			0x8
++#define IT66121_AUD_SWL_18BIT			0x4
++#define IT66121_AUD_SWL_16BIT			0x2
++#define IT66121_AUD_SWL_NOT_INDICATED		0x0
++
++
++enum it66121_input_clock {
++	IT66121_INPUT_CLOCK_1X,
++	IT66121_INPUT_CLOCK_2X,
++	IT66121_INPUT_CLOCK_DDR,
++};
++
++enum it66121_input_justification {
++	IT66121_INPUT_JUSTIFICATION_EVENLY = 0,
++	IT66121_INPUT_JUSTIFICATION_RIGHT = 1,
++	IT66121_INPUT_JUSTIFICATION_LEFT = 2,
++};
++
++enum it66121_input_sync_pulse {
++	IT66121_INPUT_SYNC_PULSE_DE = 0,
++	IT66121_INPUT_SYNC_PULSE_HSYNC = 1,
++	IT66121_INPUT_SYNC_PULSE_VSYNC = 2,
++	IT66121_INPUT_SYNC_PULSE_NONE = 3,
++};
++
++/**
++ * enum it66121_sync_polarity - Polarity for the input sync signals
++ * @IT66121_SYNC_POLARITY_PASSTHROUGH:  Sync polarity matches that of
++ *				       the currently configured mode.
++ * @IT66121_SYNC_POLARITY_LOW:	    Sync polarity is low
++ * @IT66121_SYNC_POLARITY_HIGH:	    Sync polarity is high
++ *
++ * If the polarity is set to either LOW or HIGH the driver will configure the
++ * IT66121 to internally invert the sync signal if required to match the sync
++ * polarity setting for the currently selected output mode.
++ *
++ * If the polarity is set to PASSTHROUGH, the IT66121 will route the signal
++ * unchanged. This is used when the upstream graphics core already generates
++ * the sync signals with the correct polarity.
++ */
++enum it66121_sync_polarity {
++	IT66121_SYNC_POLARITY_PASSTHROUGH,
++	IT66121_SYNC_POLARITY_LOW,
++	IT66121_SYNC_POLARITY_HIGH,
++};
++
++
++/**
++ * struct it66121_link_config - Describes it66121 hardware configuration
++ * @input_color_depth:		Number of bits per color component (8, 10 or 12)
++ * @input_colorspace:		The input colorspace (RGB, YUV444, YUV422)
++ * @input_clock:		The input video clock style (1x, 2x, DDR)
++ * @input_style:		The input component arrangement variant
++ * @input_justification:	Video input format bit justification
++ * @clock_delay:		Clock delay for the input clock (in ps)
++ * @embedded_sync:		Video input uses BT.656-style embedded sync
++ * @sync_pulse:			Select the sync pulse
++ * @vsync_polarity:		vsync input signal configuration
++ * @hsync_polarity:		hsync input signal configuration
++ */
++struct it66121_link_config {
++	unsigned int input_color_depth;
++	enum hdmi_colorspace input_colorspace;
++	enum it66121_input_clock input_clock;
++	unsigned int input_style;
++	enum it66121_input_justification input_justification;
++
++	int clock_delay;
++
++	bool embedded_sync;
++	enum it66121_input_sync_pulse sync_pulse;
++	enum it66121_sync_polarity vsync_polarity;
++	enum it66121_sync_polarity hsync_polarity;
++};
++
++enum it66121_type {
++	IT66121,
++};
++
++#define iT66121_MAX_ADDRS 3
++
++struct it66121 {
++	struct i2c_client *i2c_main;
++	struct i2c_client *i2c_edid;
++	struct i2c_client *i2c_packet;
++	struct i2c_client *i2c_cec;
++
++	struct regmap *regmap;
++	enum drm_connector_status status;
++	bool powered;
++
++	unsigned int current_edid_segment;
++	uint8_t edid_buf[256];
++
++	wait_queue_head_t wq;
++	struct work_struct hpd_work;
++
++	struct drm_bridge bridge;
++	struct drm_connector connector;
++
++	struct mutex lock; /* Protects fields below and device registers */
++	struct hdmi_avi_infoframe hdmi_avi_infoframe;
++	struct {
++		struct platform_device *pdev;
++		u8 ch_enable;
++		u8 fs;
++		u8 swl;
++		bool auto_cts;
++	} audio;
++	struct gpio_desc *gpio_reset;
++	unsigned int num_supplies;
++	u32 bus_width;
++
++	bool embedded_sync;
++	bool rgb;
++	bool is_hdmi;
++
++	struct regulator_bulk_data supplies[3];
++
++	struct device_node *host_node;
++
++	enum it66121_type type;
++
++	struct cec_adapter *cec_adap;
++	struct clk *cec_clk;
++	u32 cec_clk_freq;
++
++	enum it66121_sync_polarity vsync_polarity;
++	enum it66121_sync_polarity hsync_polarity;
++};
++
++
++#endif /* __IT66121_H__ */
+diff --git a/drivers/gpu/drm/bridge/it66121_drv.c b/drivers/gpu/drm/bridge/it66121_drv.c
+new file mode 100755
+index 000000000000..242cc42d1ae9
+--- /dev/null
++++ b/drivers/gpu/drm/bridge/it66121_drv.c
+@@ -0,0 +1,1553 @@
++/* License-Identifier: GPL-2.0 */
++/*
++ * Based on the un-official documentation found on the net and registers
++ * description from source code:
++ *  - it66121 driver
++ *
++ * (C) Copyright 2023, Simon Chiang
++ */
++
++#include <linux/module.h>
++#include <linux/device.h>
++#include <linux/interrupt.h>
++#include <linux/i2c.h>
++#include <linux/bitfield.h>
++#include <linux/property.h>
++#include <linux/regmap.h>
++#include <linux/of_graph.h>
++#include <linux/gpio/consumer.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/regulator/consumer.h>
++
++#include <drm/drm_atomic_helper.h>
++#include <drm/drm_bridge.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_edid.h>
++#include <drm/drm_modes.h>
++#include <drm/drm_print.h>
++
++#include <sound/hdmi-codec.h>
++
++
++#include <linux/of_device.h>
++#include <linux/slab.h>
++#include <linux/clk.h>
++
++#include <drm/drmP.h>
++#include <drm/drm_atomic.h>
++
++#include <media/cec.h>
++
++#include "it66121.h"
++
++
++#define VENDOR_ID      0x4954
++#define DEVICE_ID      0x1612
++
++static const struct regmap_range_cfg it66121_regmap_banks[] = {
++	{
++		.name = "it66121",
++		.range_min = 0x00,
++		.range_max = 0x1FF,
++		.selector_reg = IT66121_CLK_BANK_REG,
++		.selector_mask = 0x1,
++		.selector_shift = 0,
++		.window_start = 0x00,
++		.window_len = 0x100,
++	},
++};
++
++static const struct regmap_config it66121_regmap_config = {
++	.val_bits = 8,
++	.reg_bits = 8,
++	.max_register = 0x1FF,
++	.ranges = it66121_regmap_banks,
++	.num_ranges = ARRAY_SIZE(it66121_regmap_banks),
++};
++
++struct it66121 *pit66121;
++
++static void it66121_set_config_csc(struct it66121 *ctx,
++				   struct drm_connector *connector,
++				   bool rgb, bool hdmi_mode)
++{
++	int ret;
++	u8 mode = IT66121_INPUT_MODE_RGB;
++
++	if (ctx->bus_width == 12)
++		mode |= IT66121_INPUT_MODE_DDR;
++
++	ret = regmap_write(ctx->regmap, IT66121_INPUT_MODE_REG, mode);
++	if (ret) {
++		printk("ERROR: regmap_write !\n");
++		return;
++	}
++
++	ret = regmap_write(ctx->regmap, IT66121_INPUT_CSC_REG, IT66121_INPUT_CSC_NO_CONV);
++	if (ret) {
++		printk("ERROR: regmap_write !\n");
++		return;
++	}
++}
++
++static void it66121_set_link_config(struct it66121 *it66121,
++				    const struct it66121_link_config *config)
++{
++	unsigned int clock_delay;
++	unsigned int color_depth;
++	unsigned int input_id;
++
++	clock_delay = (config->clock_delay + 1200) / 400;
++	color_depth = config->input_color_depth == 8 ? 3
++		    : (config->input_color_depth == 10 ? 1 : 2);
++
++	/* TODO Support input ID 6 */
++	if (config->input_colorspace != HDMI_COLORSPACE_YUV422)
++		input_id = config->input_clock == IT66121_INPUT_CLOCK_DDR
++			 ? 5 : 0;
++	else if (config->input_clock == IT66121_INPUT_CLOCK_DDR)
++		input_id = config->embedded_sync ? 8 : 7;
++	else if (config->input_clock == IT66121_INPUT_CLOCK_2X)
++		input_id = config->embedded_sync ? 4 : 3;
++	else
++		input_id = config->embedded_sync ? 2 : 1;
++
++	it66121->embedded_sync = config->embedded_sync;
++	it66121->hsync_polarity = config->hsync_polarity;
++	it66121->vsync_polarity = config->vsync_polarity;
++	it66121->rgb = config->input_colorspace == HDMI_COLORSPACE_RGB;
++}
++
++static void __it66121_power_on(struct it66121 *ctx)
++{
++#if 0
++	it66121->current_edid_segment = -1;
++
++	regmap_update_bits(it66121->regmap, IT66121_REG_POWER,
++			   IT66121_POWER_POWER_DOWN, 0);
++	if (it66121->i2c_main->irq) {
++		/*
++		 * Documentation says the INT_ENABLE registers are reset in
++		 * POWER_DOWN mode. My 7511w preserved the bits, however.
++		 * Still, let's be safe and stick to the documentation.
++		 */
++		regmap_write(it66121->regmap, IT66121_REG_INT_ENABLE(0),
++			     IT66121_INT0_EDID_READY | IT66121_INT0_HPD);
++		regmap_update_bits(it66121->regmap,
++				   IT66121_REG_INT_ENABLE(1),
++				   IT66121_INT1_DDC_ERROR,
++				   IT66121_INT1_DDC_ERROR);
++	}
++
++	/*
++	 * Per spec it is allowed to pulse the HPD signal to indicate that the
++	 * EDID information has changed. Some monitors do this when they wakeup
++	 * from standby or are enabled. When the HPD goes low the it66121 is
++	 * reset and the outputs are disabled which might cause the monitor to
++	 * go to standby again. To avoid this we ignore the HPD pin for the
++	 * first few seconds after enabling the output.
++	 */
++	regmap_update_bits(it66121->regmap, IT66121_REG_POWER2,
++			   IT66121_REG_POWER2_HPD_SRC_MASK,
++			   IT66121_REG_POWER2_HPD_SRC_NONE);
++#endif
++}
++
++static inline void it66121_power_on(struct it66121 *ctx)
++{
++	int ret;
++
++	__it66121_power_on( ctx );
++
++	ctx->powered = true;
++
++	ret = regulator_bulk_enable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
++	if (ret)
++		printk("ERROR: power on\n");
++
++}
++
++static void __it66121_power_off(struct it66121 *it66121)
++{
++}
++
++static inline int it66121_power_off(struct it66121 *ctx)
++{
++	ctx->powered = false;
++
++	return regulator_bulk_disable(ARRAY_SIZE(ctx->supplies), ctx->supplies);
++}
++
++/* -----------------------------------------------------------------------------
++ * Interrupt and hotplug detection
++ */
++
++static bool it66121_hpd(struct it66121 *ctx)
++{
++	int val;
++	int ret = regmap_read(ctx->regmap, IT66121_INT_STATUS1_REG, &val);
++
++	if ( ret < 0 )
++		return ret;
++
++	return val & IT66121_INT_STATUS1_HPD_STATUS;
++}
++
++static inline int it66121_preamble_ddc(struct it66121 *ctx)
++{
++	return regmap_write(ctx->regmap, IT66121_MASTER_SEL_REG, IT66121_MASTER_SEL_HOST);
++}
++
++static inline int it66121_fire_afe(struct it66121 *ctx)
++{
++	return regmap_write(ctx->regmap, IT66121_AFE_DRV_REG, 0);
++}
++
++/* TOFIX: Handle YCbCr Input & Output */
++static int it66121_configure_input(struct it66121 *ctx)
++{
++	int ret;
++	u8 mode = IT66121_INPUT_MODE_RGB;
++
++	if (ctx->bus_width == 12)
++		mode |= IT66121_INPUT_MODE_DDR;
++
++	ret = regmap_write(ctx->regmap, IT66121_INPUT_MODE_REG, mode);
++	if (ret)
++		return ret;
++
++	return regmap_write(ctx->regmap, IT66121_INPUT_CSC_REG, IT66121_INPUT_CSC_NO_CONV);
++}
++
++/**
++ * it66121_configure_afe() - Configure the analog front end
++ * @ctx: it66121 object
++ * @mode: mode to configure
++ *
++ * RETURNS:
++ * zero if success, a negative error code otherwise.
++ */
++static int it66121_configure_afe(struct it66121 *ctx,
++				 const struct drm_display_mode *mode)
++{
++	int ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AFE_DRV_REG,
++			   IT66121_AFE_DRV_RST);
++	if (ret)
++		return ret;
++
++	if (mode->clock > IT66121_AFE_CLK_HIGH) {
++		ret = regmap_write_bits(ctx->regmap, IT66121_AFE_XP_REG,
++					IT66121_AFE_XP_GAINBIT |
++					IT66121_AFE_XP_ENO,
++					IT66121_AFE_XP_GAINBIT);
++		if (ret)
++			return ret;
++
++		ret = regmap_write_bits(ctx->regmap, IT66121_AFE_IP_REG,
++					IT66121_AFE_IP_GAINBIT |
++					IT66121_AFE_IP_ER0 |
++					IT66121_AFE_IP_EC1,
++					IT66121_AFE_IP_GAINBIT);
++		if (ret)
++			return ret;
++
++		ret = regmap_write_bits(ctx->regmap, IT66121_AFE_XP_EC1_REG,
++					IT66121_AFE_XP_EC1_LOWCLK, 0x80);
++		if (ret)
++			return ret;
++	} else {
++		ret = regmap_write_bits(ctx->regmap, IT66121_AFE_XP_REG,
++					IT66121_AFE_XP_GAINBIT |
++					IT66121_AFE_XP_ENO,
++					IT66121_AFE_XP_ENO);
++		if (ret)
++			return ret;
++
++		ret = regmap_write_bits(ctx->regmap, IT66121_AFE_IP_REG,
++					IT66121_AFE_IP_GAINBIT |
++					IT66121_AFE_IP_ER0 |
++					IT66121_AFE_IP_EC1, IT66121_AFE_IP_ER0 |
++					IT66121_AFE_IP_EC1);
++		if (ret)
++			return ret;
++
++		ret = regmap_write_bits(ctx->regmap, IT66121_AFE_XP_EC1_REG,
++					IT66121_AFE_XP_EC1_LOWCLK,
++					IT66121_AFE_XP_EC1_LOWCLK);
++		if (ret)
++			return ret;
++	}
++
++	/* Clear reset flags */
++	ret = regmap_write_bits(ctx->regmap, IT66121_SW_RST_REG,
++				IT66121_SW_RST_REF | IT66121_SW_RST_VID, 0);
++	if (ret)
++		return ret;
++
++	return it66121_fire_afe(ctx);
++}
++
++static inline int it66121_wait_ddc_ready(struct it66121 *ctx)
++{
++	int ret, val;
++	u32 busy = IT66121_DDC_STATUS_NOACK | IT66121_DDC_STATUS_WAIT_BUS |
++		   IT66121_DDC_STATUS_ARBI_LOSE;
++
++	ret = regmap_read_poll_timeout(ctx->regmap, IT66121_DDC_STATUS_REG, val, true,
++				       IT66121_EDID_SLEEP_US, IT66121_EDID_TIMEOUT_US);
++	if (ret)
++		return ret;
++
++	if (val & busy)
++		return -EAGAIN;
++
++	return 0;
++}
++
++static int it66121_clear_ddc_fifo(struct it66121 *ctx)
++{
++	int ret;
++
++	ret = it66121_preamble_ddc(ctx);
++	if (ret)
++		return ret;
++
++	return regmap_write(ctx->regmap, IT66121_DDC_COMMAND_REG,
++			    IT66121_DDC_COMMAND_FIFO_CLR);
++}
++
++static int it66121_abort_ddc_ops(struct it66121 *ctx)
++{
++	int ret;
++	unsigned int swreset, cpdesire;
++
++	ret = regmap_read(ctx->regmap, IT66121_SW_RST_REG, &swreset);
++	if (ret)
++		return ret;
++
++	ret = regmap_read(ctx->regmap, IT66121_HDCP_REG, &cpdesire);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_HDCP_REG,
++			   cpdesire & (~IT66121_HDCP_CPDESIRED & 0xFF));
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_SW_RST_REG,
++			   (swreset | IT66121_SW_RST_HDCP));
++	if (ret)
++		return ret;
++
++	ret = it66121_preamble_ddc(ctx);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_DDC_COMMAND_REG,
++			   IT66121_DDC_COMMAND_ABORT);
++	if (ret)
++		return ret;
++
++	return it66121_wait_ddc_ready(ctx);
++}
++
++static bool it66121_is_hpd_detect(struct it66121 *ctx)
++{
++	int val;
++	int ret = regmap_read(ctx->regmap, IT66121_SYS_STATUS_REG, &val);
++
++	if ( ret < 0 )
++		return ret;
++
++	return val & IT66121_SYS_STATUS_HPDETECT;
++}
++
++static int it66121_get_edid_block(void *data, u8 *buf, unsigned int block, size_t len)
++{
++	struct it66121 *ctx = data;
++	unsigned int val;
++	int remain = len;
++	int offset = 0;
++	int ret, cnt;
++
++	offset = (block % 2) * len;
++	block = block / 2;
++
++	ret = regmap_read(ctx->regmap, IT66121_INT_STATUS1_REG, &val);
++	if (ret)
++		return ret;
++
++	if (val & IT66121_INT_STATUS1_DDC_BUSHANG) {
++		ret = it66121_abort_ddc_ops(ctx);
++		if (ret)
++			return ret;
++	}
++
++	ret = it66121_clear_ddc_fifo(ctx);
++	if (ret)
++		return ret;
++
++	while (remain > 0) {
++		cnt = (remain > IT66121_EDID_FIFO_SIZE) ?
++				IT66121_EDID_FIFO_SIZE : remain;
++		ret = it66121_preamble_ddc(ctx);
++		if (ret)
++			return ret;
++
++		ret = regmap_write(ctx->regmap, IT66121_DDC_COMMAND_REG,
++				   IT66121_DDC_COMMAND_FIFO_CLR);
++		if (ret)
++			return ret;
++
++		ret = it66121_wait_ddc_ready(ctx);
++		if (ret)
++			return ret;
++
++		ret = regmap_read(ctx->regmap, IT66121_INT_STATUS1_REG, &val);
++		if (ret)
++			return ret;
++
++		if (val & IT66121_INT_STATUS1_DDC_BUSHANG) {
++			ret = it66121_abort_ddc_ops(ctx);
++			if (ret)
++				return ret;
++		}
++
++		ret = it66121_preamble_ddc(ctx);
++		if (ret)
++			return ret;
++
++		ret = regmap_write(ctx->regmap, IT66121_DDC_HEADER_REG,
++				   IT66121_DDC_HEADER_EDID);
++		if (ret)
++			return ret;
++
++		ret = regmap_write(ctx->regmap, IT66121_DDC_OFFSET_REG, offset);
++		if (ret)
++			return ret;
++
++		ret = regmap_write(ctx->regmap, IT66121_DDC_BYTE_REG, cnt);
++		if (ret)
++			return ret;
++
++		ret = regmap_write(ctx->regmap, IT66121_DDC_SEGMENT_REG, block);
++		if (ret)
++			return ret;
++
++		ret = regmap_write(ctx->regmap, IT66121_DDC_COMMAND_REG,
++				   IT66121_DDC_COMMAND_EDID_READ);
++		if (ret)
++			return ret;
++
++		offset += cnt;
++		remain -= cnt;
++
++		/* Per programming manual, sleep here before emptying the FIFO */
++		msleep(20);
++
++		ret = it66121_wait_ddc_ready(ctx);
++		if (ret)
++			return ret;
++
++		do {
++			ret = regmap_read(ctx->regmap, IT66121_DDC_RD_FIFO_REG, &val);
++			if (ret)
++				return ret;
++			*(buf++) = val;
++			cnt--;
++		} while (cnt > 0);
++	}
++
++	return 0;
++}
++
++static int it66121_get_modes(struct it66121 *ctx,
++			     struct drm_connector *connector)
++{
++	u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
++	struct edid *edid;
++	static unsigned int count = 0;
++	int ret;
++
++	/* Reading the EDID only works if the device is powered */
++	if (!ctx->powered) {
++		__it66121_power_on(ctx);
++	}
++
++	edid = drm_do_get_edid(connector, it66121_get_edid_block, ctx);
++
++	if (!ctx->powered)
++		__it66121_power_off(ctx);
++
++
++	drm_mode_connector_update_edid_property(connector, edid);
++	if (edid) {
++		count = drm_add_edid_modes(connector, edid);
++		ctx->is_hdmi = drm_detect_hdmi_monitor(edid);
++
++		kfree(edid);
++	}
++
++	ret = drm_display_info_set_bus_formats(&connector->display_info,
++							   &bus_format, 1);
++	if (ret)
++		return ret;
++
++	return count;
++}
++
++static enum drm_connector_status
++it66121_detect(struct it66121 *ctx, struct drm_connector *connector)
++{
++	enum drm_connector_status status;
++//	unsigned int val;
++	bool hpd;
++	int ret;
++
++	ret = it66121_is_hpd_detect( ctx );
++	if (ret < 0)
++		return connector_status_disconnected;
++
++	if( ret )
++		status = connector_status_connected;
++	else
++		status = connector_status_disconnected;
++
++	hpd = 1;
++
++	/* The chip resets itself when the cable is disconnected, so in case
++	 * there is a pending HPD interrupt and the cable is connected there was
++	 * at least one transition from disconnected to connected and the chip
++	 * has to be reinitialized. */
++	if (status == connector_status_connected && hpd&& ctx->powered) {
++//		regcache_mark_dirty(ctx->regmap);
++//		it66121_power_on(ctx);
++//		it66121_get_modes(ctx, connector);
++//		if (ctx->status == connector_status_connected)
++//			status = connector_status_disconnected;
++	} else {
++		/* Renable HPD sensing */
++//		regmap_update_bits(ctx->regmap, IT66121_REG_POWER2,
++//				   IT66121_REG_POWER2_HPD_SRC_MASK,
++//				   IT66121_REG_POWER2_HPD_SRC_BOTH);
++	}
++
++	ctx->status = status;
++
++	return status;
++}
++
++static int it66121_connector_get_modes(struct drm_connector *connector)
++{
++	struct it66121 *ctx = container_of(connector, struct it66121, connector);
++
++	return it66121_get_modes(ctx, connector);
++}
++
++static enum drm_mode_status it66121_connector_mode_valid(struct drm_connector *connector,
++							 struct drm_display_mode *mode)
++{
++	struct it66121 *ctx = pit66121;
++	unsigned long max_clock;
++
++	max_clock = (ctx->bus_width == 12) ? 74250 : 148500;
++
++	if (mode->clock > max_clock)
++		return MODE_CLOCK_HIGH;
++
++	if (mode->clock < 25000)
++		return MODE_CLOCK_LOW;
++
++	return MODE_OK;
++}
++
++static struct drm_connector_helper_funcs it66121_connector_helper_funcs = {
++	.get_modes = it66121_connector_get_modes,
++	.mode_valid = it66121_connector_mode_valid,
++};
++
++static enum drm_connector_status it66121_connector_detect(struct drm_connector *connector,
++							  bool force)
++{
++	struct it66121 *ctx = container_of(connector, struct it66121, connector);
++
++	return it66121_detect(ctx, connector);
++}
++
++static const struct drm_connector_funcs it66121_connector_funcs = {
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.detect = it66121_connector_detect,
++	.destroy = drm_connector_cleanup,
++	.reset = drm_atomic_helper_connector_reset,
++	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
++	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
++};
++
++static int it66121_bind(struct device *comp, struct device *master, void *master_data)
++{
++	int ret;
++	struct drm_bridge *bridge = dev_get_drvdata(comp);
++	struct drm_simple_display_pipe *pipe = master_data;
++	struct i2c_adapter *adapter = i2c_verify_adapter(master);
++
++	if(!adapter)
++		return -ENODEV;
++
++	dev_info(comp, "Binding IT66121 component");
++
++	/* XXX: check adapter, check bridge */
++
++	ret = drm_simple_display_pipe_attach_bridge(pipe, bridge);
++	if (ret)
++		dev_err(comp, "Cannot attach IT66121 bridge (%d)", ret);
++
++	return ret;
++}
++
++static void it66121_unbind(struct device *comp, struct device *master, void *master_data)
++{
++	dev_info(comp, "Unbinding IT66121 component");
++
++	/* TODO: drm_bridge_detach()? */
++}
++
++static const struct component_ops it66121_component_ops = {
++	.bind = it66121_bind,
++	.unbind = it66121_unbind,
++};
++
++static int it66121_bridge_attach(struct drm_bridge *bridge)
++{
++	struct it66121 *ctx = container_of(bridge, struct it66121, bridge);
++	int ret;
++
++	if (!bridge->encoder) {
++		DRM_ERROR("Parent encoder object not found");
++		return -ENODEV;
++	}
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_CLK_BANK_REG,
++				IT66121_CLK_BANK_PWROFF_RCLK, 0);
++	if (ret)
++		return ret;
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_INT_REG,
++				IT66121_INT_TX_CLK_OFF, 0);
++	if (ret)
++		return ret;
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_AFE_DRV_REG,
++				IT66121_AFE_DRV_PWD, 0);
++	if (ret)
++		return ret;
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_AFE_XP_REG,
++				IT66121_AFE_XP_PWDI | IT66121_AFE_XP_PWDPLL, 0);
++	if (ret)
++		return ret;
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_AFE_IP_REG,
++				IT66121_AFE_IP_PWDPLL, 0);
++	if (ret)
++		return ret;
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_AFE_DRV_REG,
++				IT66121_AFE_DRV_RST, 0);
++	if (ret)
++		return ret;
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_AFE_XP_REG,
++				IT66121_AFE_XP_RESETB, IT66121_AFE_XP_RESETB);
++	if (ret)
++		return ret;
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_AFE_IP_REG,
++				IT66121_AFE_IP_RESETB, IT66121_AFE_IP_RESETB);
++	if (ret)
++		return ret;
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_SW_RST_REG,
++				IT66121_SW_RST_REF,
++				IT66121_SW_RST_REF);
++	if (ret)
++		return ret;
++
++	/* Per programming manual, sleep here for bridge to settle */
++	msleep(50);
++
++	if (ctx->i2c_main->irq) {
++		ctx->connector.polled = DRM_CONNECTOR_POLL_HPD;
++	}
++	else
++	{
++		ctx->connector.polled = DRM_CONNECTOR_POLL_CONNECT |
++				DRM_CONNECTOR_POLL_DISCONNECT;
++	}
++
++	ret = drm_connector_init(bridge->dev, &ctx->connector,
++				 &it66121_connector_funcs,
++				 DRM_MODE_CONNECTOR_HDMIA);
++	if (ret) {
++		DRM_ERROR("Cannot initialize bridge connector");
++		return ret;
++	}
++
++	drm_connector_helper_add(&ctx->connector,
++				 &it66121_connector_helper_funcs);
++	drm_mode_connector_attach_encoder(&ctx->connector, bridge->encoder);
++
++	if (ret) {
++		DRM_ERROR("Cannot attach bridge");
++		return ret;
++	}
++
++	/* Start interrupts */
++	ret = regmap_write_bits(ctx->regmap, IT66121_INT_MASK1_REG,
++				 IT66121_INT_MASK1_DDC_NOACK |
++				 IT66121_INT_MASK1_DDC_FIFOERR |
++				 IT66121_INT_MASK1_DDC_BUSHANG, 0);
++	if (ret) {
++		// failed to enable HPD IRQ
++		printk("ERROR: Start irq !\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static int it66121_set_mute(struct it66121 *ctx, bool mute)
++{
++	int ret;
++	unsigned int val = 0;
++
++	if (mute)
++		val = IT66121_AV_MUTE_ON;
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_AV_MUTE_REG, IT66121_AV_MUTE_ON, val);
++	if (ret)
++		return ret;
++
++	return regmap_write(ctx->regmap, IT66121_PKT_GEN_CTRL_REG,
++			    IT66121_PKT_GEN_CTRL_ON | IT66121_PKT_GEN_CTRL_RPT);
++}
++static void it66121_bridge_detach(struct drm_bridge *bridge)
++{
++	/* TODO: Detach encoder */
++	dev_info(bridge->dev->dev, "it66121_bridge_detach");
++}
++
++static void it66121_bridge_enable(struct drm_bridge *bridge)
++{
++	struct it66121 *ctx = container_of(bridge, struct it66121, bridge);
++
++	it66121_set_mute(ctx, false);
++}
++
++static void it66121_bridge_disable(struct drm_bridge *bridge)
++{
++	struct it66121 *ctx = container_of(bridge, struct it66121, bridge);
++
++	it66121_set_mute(ctx, true);
++}
++
++static void it66121_bridge_mode_set(struct drm_bridge *bridge, struct drm_display_mode *mode,
++				    struct drm_display_mode *adjusted_mode)
++
++{
++	int ret, i;
++	u8 buf[HDMI_INFOFRAME_SIZE(AVI)];
++	struct it66121 *ctx = container_of(bridge, struct it66121, bridge);
++
++	const u16 aviinfo_reg[HDMI_AVI_INFOFRAME_SIZE] = {
++		IT66121_AVIINFO_DB1_REG,
++		IT66121_AVIINFO_DB2_REG,
++		IT66121_AVIINFO_DB3_REG,
++		IT66121_AVIINFO_DB4_REG,
++		IT66121_AVIINFO_DB5_REG,
++		IT66121_AVIINFO_DB6_REG,
++		IT66121_AVIINFO_DB7_REG,
++		IT66121_AVIINFO_DB8_REG,
++		IT66121_AVIINFO_DB9_REG,
++		IT66121_AVIINFO_DB10_REG,
++		IT66121_AVIINFO_DB11_REG,
++		IT66121_AVIINFO_DB12_REG,
++		IT66121_AVIINFO_DB13_REG
++	};
++
++	mutex_lock(&ctx->lock);
++
++	hdmi_avi_infoframe_init(&ctx->hdmi_avi_infoframe);
++
++	ret = drm_hdmi_avi_infoframe_from_display_mode(&ctx->hdmi_avi_infoframe, mode,
++						       false);
++	if (ret) {
++		DRM_ERROR("Failed to setup AVI infoframe: %d\n", ret);
++		goto unlock;
++	}
++
++	ret = hdmi_avi_infoframe_pack(&ctx->hdmi_avi_infoframe, buf, sizeof(buf));
++	if (ret < 0) {
++		DRM_ERROR("Failed to pack infoframe: %d\n", ret);
++		goto unlock;
++	}
++
++	/* Write new AVI infoframe packet */
++	for (i = 0; i < HDMI_AVI_INFOFRAME_SIZE; i++) {
++		if (regmap_write(ctx->regmap, aviinfo_reg[i], buf[i + HDMI_INFOFRAME_HEADER_SIZE]))
++			goto unlock;
++	}
++	if (regmap_write(ctx->regmap, IT66121_AVIINFO_CSUM_REG, buf[3]))
++		goto unlock;
++
++	/* Enable AVI infoframe */
++	if (regmap_write(ctx->regmap, IT66121_AVI_INFO_PKT_REG,
++			 IT66121_AVI_INFO_PKT_ON | IT66121_AVI_INFO_PKT_RPT))
++		goto unlock;
++
++	/* Set TX mode to HDMI */
++	if (regmap_write(ctx->regmap, IT66121_HDMI_MODE_REG, IT66121_HDMI_MODE_HDMI))
++		goto unlock;
++
++	if (regmap_write_bits(ctx->regmap, IT66121_CLK_BANK_REG,
++			      IT66121_CLK_BANK_PWROFF_TXCLK, IT66121_CLK_BANK_PWROFF_TXCLK))
++		goto unlock;
++
++	if (it66121_configure_input(ctx))
++		goto unlock;
++
++	if (it66121_configure_afe(ctx, adjusted_mode))
++		goto unlock;
++
++	regmap_write_bits(ctx->regmap, IT66121_CLK_BANK_REG, IT66121_CLK_BANK_PWROFF_TXCLK, 0);
++
++unlock:
++	mutex_unlock(&ctx->lock);
++}
++
++static const struct drm_bridge_funcs it66121_bridge_funcs = {
++	.attach = it66121_bridge_attach,
++	.detach = it66121_bridge_detach,
++	.enable = it66121_bridge_enable,
++	.disable = it66121_bridge_disable,
++	.mode_set = it66121_bridge_mode_set,
++};
++
++static irqreturn_t it66121_irq_threaded_handler(int irq, void *dev_id)
++{
++	int ret;
++	unsigned int val;
++	struct it66121 *ctx = dev_id;
++	struct device *dev = &ctx->i2c_main->dev;
++	enum drm_connector_status status;
++	bool event = false;
++
++	mutex_lock(&ctx->lock);
++
++	ret = regmap_read(ctx->regmap, IT66121_SYS_STATUS_REG, &val);
++	if (ret)
++		goto unlock;
++
++	if (!(val & IT66121_SYS_STATUS_ACTIVE_IRQ))
++		goto unlock;
++
++	ret = regmap_read(ctx->regmap, IT66121_INT_STATUS1_REG, &val);
++	if (ret) {
++		dev_err(dev, "Cannot read STATUS1_REG %d\n", ret);
++	} else {
++		if (val & IT66121_INT_STATUS1_DDC_FIFOERR)
++			it66121_clear_ddc_fifo(ctx);
++		if (val & (IT66121_INT_STATUS1_DDC_BUSHANG |
++			   IT66121_INT_STATUS1_DDC_NOACK))
++			it66121_abort_ddc_ops(ctx);
++		if (val & IT66121_INT_STATUS1_HPD_STATUS) {
++			regmap_write_bits(ctx->regmap, IT66121_INT_CLR1_REG,
++					  IT66121_INT_CLR1_HPD, IT66121_INT_CLR1_HPD);
++
++			status = it66121_is_hpd_detect(ctx) ? connector_status_connected
++							    : connector_status_disconnected;
++
++			event = true;
++		}
++	}
++
++	regmap_write_bits(ctx->regmap, IT66121_SYS_STATUS_REG,
++			  IT66121_SYS_STATUS_CLEAR_IRQ,
++			  IT66121_SYS_STATUS_CLEAR_IRQ);
++
++unlock:
++	mutex_unlock(&ctx->lock);
++
++	if (event)
++		// drm_bridge_hpd_notify(&ctx->bridge, status);
++		drm_helper_hpd_irq_event(ctx->bridge.dev);
++
++	return IRQ_HANDLED;
++}
++
++static int it661221_set_chstat(struct it66121 *ctx, u8 iec60958_chstat[])
++{
++	int ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_CHST_MODE_REG, iec60958_chstat[0] & 0x7C);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_CHST_CAT_REG, iec60958_chstat[1]);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_CHST_SRCNUM_REG, iec60958_chstat[2] & 0x0F);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_CHST_CHTNUM_REG,
++			   (iec60958_chstat[2] >> 4) & 0x0F);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_CHST_CA_FS_REG, iec60958_chstat[3]);
++	if (ret)
++		return ret;
++
++	return regmap_write(ctx->regmap, IT66121_AUD_CHST_OFS_WL_REG, iec60958_chstat[4]);
++}
++
++static int it661221_set_lpcm_audio(struct it66121 *ctx, u8 audio_src_num, u8 audio_swl)
++{
++	int ret;
++	unsigned int audio_enable = 0;
++	unsigned int audio_format = 0;
++
++	switch (audio_swl) {
++	case 16:
++		audio_enable |= IT66121_AUD_16BIT;
++		break;
++	case 18:
++		audio_enable |= IT66121_AUD_18BIT;
++		break;
++	case 20:
++		audio_enable |= IT66121_AUD_20BIT;
++		break;
++	case 24:
++	default:
++		audio_enable |= IT66121_AUD_24BIT;
++		break;
++	}
++
++	audio_format |= 0x40;
++	switch (audio_src_num) {
++	case 4:
++		audio_enable |= IT66121_AUD_EN_I2S3 | IT66121_AUD_EN_I2S2 |
++				IT66121_AUD_EN_I2S1 | IT66121_AUD_EN_I2S0;
++		break;
++	case 3:
++		audio_enable |= IT66121_AUD_EN_I2S2 | IT66121_AUD_EN_I2S1 |
++				IT66121_AUD_EN_I2S0;
++		break;
++	case 2:
++		audio_enable |= IT66121_AUD_EN_I2S1 | IT66121_AUD_EN_I2S0;
++		break;
++	case 1:
++	default:
++		audio_format &= ~0x40;
++		audio_enable |= IT66121_AUD_EN_I2S0;
++		break;
++	}
++
++	audio_format |= 0x01;
++	ctx->audio.ch_enable = audio_enable;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_CTRL0_REG, audio_enable & 0xF0);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_CTRL1_REG, audio_format);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_FIFOMAP_REG, 0xE4);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_CTRL3_REG, 0x00);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_SRCVALID_FLAT_REG, 0x00);
++	if (ret)
++		return ret;
++
++	return regmap_write(ctx->regmap, IT66121_AUD_HDAUDIO_REG, 0x00);
++}
++
++static int it661221_set_ncts(struct it66121 *ctx, u8 fs)
++{
++	int ret;
++	unsigned int n;
++
++	switch (fs) {
++	case IT66121_AUD_FS_32K:
++		n = 4096;
++		break;
++	case IT66121_AUD_FS_44P1K:
++		n = 6272;
++		break;
++	case IT66121_AUD_FS_48K:
++		n = 6144;
++		break;
++	case IT66121_AUD_FS_88P2K:
++		n = 12544;
++		break;
++	case IT66121_AUD_FS_96K:
++		n = 12288;
++		break;
++	case IT66121_AUD_FS_176P4K:
++		n = 25088;
++		break;
++	case IT66121_AUD_FS_192K:
++		n = 24576;
++		break;
++	case IT66121_AUD_FS_768K:
++		n = 24576;
++		break;
++	default:
++		n = 6144;
++		break;
++	}
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_PKT_N0_REG, (u8)((n) & 0xFF));
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_PKT_N1_REG, (u8)((n >> 8) & 0xFF));
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, IT66121_AUD_PKT_N2_REG, (u8)((n >> 16) & 0xF));
++	if (ret)
++		return ret;
++
++	if (ctx->audio.auto_cts) {
++		u8 loop_cnt = 255;
++		u8 cts_stable_cnt = 0;
++		unsigned int sum_cts = 0;
++		unsigned int cts = 0;
++		unsigned int last_cts = 0;
++		unsigned int diff;
++		unsigned int val;
++
++		while (loop_cnt--) {
++			msleep(30);
++			regmap_read(ctx->regmap, IT66121_AUD_PKT_CTS_CNT2_REG, &val);
++			cts = val << 12;
++			regmap_read(ctx->regmap, IT66121_AUD_PKT_CTS_CNT1_REG, &val);
++			cts |= val << 4;
++			regmap_read(ctx->regmap, IT66121_AUD_PKT_CTS_CNT0_REG, &val);
++			cts |= val >> 4;
++			if (cts == 0) {
++				continue;
++			} else {
++				if (last_cts > cts)
++					diff = last_cts - cts;
++				else
++					diff = cts - last_cts;
++				last_cts = cts;
++				if (diff < 5) {
++					cts_stable_cnt++;
++					sum_cts += cts;
++				} else {
++					cts_stable_cnt = 0;
++					sum_cts = 0;
++					continue;
++				}
++
++				if (cts_stable_cnt >= 32) {
++					last_cts = (sum_cts >> 5);
++					break;
++				}
++			}
++		}
++
++		regmap_write(ctx->regmap, IT66121_AUD_PKT_CTS0_REG, (u8)((last_cts) & 0xFF));
++		regmap_write(ctx->regmap, IT66121_AUD_PKT_CTS1_REG, (u8)((last_cts >> 8) & 0xFF));
++		regmap_write(ctx->regmap, IT66121_AUD_PKT_CTS2_REG, (u8)((last_cts >> 16) & 0x0F));
++	}
++
++	ret = regmap_write(ctx->regmap, 0xF8, 0xC3);
++	if (ret)
++		return ret;
++
++	ret = regmap_write(ctx->regmap, 0xF8, 0xA5);
++	if (ret)
++		return ret;
++
++	if (ctx->audio.auto_cts) {
++		ret = regmap_write_bits(ctx->regmap, IT66121_PKT_CTS_CTRL_REG,
++					IT66121_PKT_CTS_CTRL_SEL,
++					1);
++	} else {
++		ret = regmap_write_bits(ctx->regmap, IT66121_PKT_CTS_CTRL_REG,
++					IT66121_PKT_CTS_CTRL_SEL,
++					0);
++	}
++
++	if (ret)
++		return ret;
++
++	return regmap_write(ctx->regmap, 0xF8, 0xFF);
++}
++
++static int it661221_audio_output_enable(struct it66121 *ctx, bool enable)
++{
++	int ret;
++
++	if (enable) {
++		ret = regmap_write_bits(ctx->regmap, IT66121_SW_RST_REG,
++					IT66121_SW_RST_AUD | IT66121_SW_RST_AREF,
++					0);
++		if (ret)
++			return ret;
++
++		ret = regmap_write_bits(ctx->regmap, IT66121_AUD_CTRL0_REG,
++					IT66121_AUD_EN_I2S3 | IT66121_AUD_EN_I2S2 |
++					IT66121_AUD_EN_I2S1 | IT66121_AUD_EN_I2S0,
++					ctx->audio.ch_enable);
++	} else {
++		ret = regmap_write_bits(ctx->regmap, IT66121_AUD_CTRL0_REG,
++					IT66121_AUD_EN_I2S3 | IT66121_AUD_EN_I2S2 |
++					IT66121_AUD_EN_I2S1 | IT66121_AUD_EN_I2S0,
++					ctx->audio.ch_enable & 0xF0);
++		if (ret)
++			return ret;
++
++		ret = regmap_write_bits(ctx->regmap, IT66121_SW_RST_REG,
++					IT66121_SW_RST_AUD | IT66121_SW_RST_AREF,
++					IT66121_SW_RST_AUD | IT66121_SW_RST_AREF);
++	}
++
++	return ret;
++}
++
++static int it661221_audio_ch_enable(struct it66121 *ctx, bool enable)
++{
++	int ret;
++
++	if (enable) {
++		ret = regmap_write(ctx->regmap, IT66121_AUD_SRCVALID_FLAT_REG, 0);
++		if (ret)
++			return ret;
++
++		ret = regmap_write(ctx->regmap, IT66121_AUD_CTRL0_REG, ctx->audio.ch_enable);
++	} else {
++		ret = regmap_write(ctx->regmap, IT66121_AUD_CTRL0_REG, ctx->audio.ch_enable & 0xF0);
++	}
++
++	return ret;
++}
++
++static int it66121_audio_hw_params(struct device *dev, void *data,
++				   struct hdmi_codec_daifmt *daifmt,
++				   struct hdmi_codec_params *params)
++{
++	u8 fs;
++	u8 swl;
++	int ret;
++	struct it66121 *ctx = dev_get_drvdata(dev);
++	static u8 iec60958_chstat[5];
++	int channels = params->channels;
++	int sample_rate = params->sample_rate;
++	int sample_width = params->sample_width;
++
++	mutex_lock(&ctx->lock);
++	dev_dbg(dev, "%s: %u, %u, %u, %u\n", __func__,
++		daifmt->fmt, sample_rate, sample_width, channels);
++
++	switch (daifmt->fmt) {
++	case HDMI_I2S:
++		dev_dbg(dev, "Using HDMI I2S\n");
++		break;
++	default:
++		dev_err(dev, "Invalid or unsupported DAI format %d\n", daifmt->fmt);
++		ret = -EINVAL;
++		goto out;
++	}
++
++	// Set audio clock recovery (N/CTS)
++	ret = regmap_write(ctx->regmap, IT66121_CLK_CTRL0_REG,
++			   IT66121_CLK_CTRL0_AUTO_OVER_SAMPLING |
++			   IT66121_CLK_CTRL0_EXT_MCLK_256FS |
++			   IT66121_CLK_CTRL0_AUTO_IPCLK);
++	if (ret)
++		goto out;
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_AUD_CTRL0_REG,
++				IT66121_AUD_CTRL0_AUD_SEL, 0); // remove spdif selection
++	if (ret)
++		goto out;
++
++	switch (sample_rate) {
++	case 44100L:
++		fs = IT66121_AUD_FS_44P1K;
++		break;
++	case 88200L:
++		fs = IT66121_AUD_FS_88P2K;
++		break;
++	case 176400L:
++		fs = IT66121_AUD_FS_176P4K;
++		break;
++	case 32000L:
++		fs = IT66121_AUD_FS_32K;
++		break;
++	case 48000L:
++		fs = IT66121_AUD_FS_48K;
++		break;
++	case 96000L:
++		fs = IT66121_AUD_FS_96K;
++		break;
++	case 192000L:
++		fs = IT66121_AUD_FS_192K;
++		break;
++	case 768000L:
++		fs = IT66121_AUD_FS_768K;
++		break;
++	default:
++		fs = IT66121_AUD_FS_48K;
++		break;
++	}
++
++	ctx->audio.fs = fs;
++	ret = it661221_set_ncts(ctx, fs);
++	if (ret) {
++		dev_err(dev, "Failed to set N/CTS: %d\n", ret);
++		goto out;
++	}
++
++	// Set audio format register (except audio channel enable)
++	ret = it661221_set_lpcm_audio(ctx, (channels + 1) / 2, sample_width);
++	if (ret) {
++		dev_err(dev, "Failed to set LPCM audio: %d\n", ret);
++		goto out;
++	}
++
++	// Set audio channel status
++	iec60958_chstat[0] = 0;
++	if ((channels + 1) / 2 == 1)
++		iec60958_chstat[0] |= 0x1;
++	iec60958_chstat[0] &= ~(1 << 1);
++	iec60958_chstat[1] = 0;
++	iec60958_chstat[2] = (channels + 1) / 2;
++	iec60958_chstat[2] |= (channels << 4) & 0xF0;
++	iec60958_chstat[3] = fs;
++
++	switch (sample_width) {
++	case 21L:
++		swl = IT66121_AUD_SWL_21BIT;
++		break;
++	case 24L:
++		swl = IT66121_AUD_SWL_24BIT;
++		break;
++	case 23L:
++		swl = IT66121_AUD_SWL_23BIT;
++		break;
++	case 22L:
++		swl = IT66121_AUD_SWL_22BIT;
++		break;
++	case 20L:
++		swl = IT66121_AUD_SWL_20BIT;
++		break;
++	case 17L:
++		swl = IT66121_AUD_SWL_17BIT;
++		break;
++	case 19L:
++		swl = IT66121_AUD_SWL_19BIT;
++		break;
++	case 18L:
++		swl = IT66121_AUD_SWL_18BIT;
++		break;
++	case 16L:
++		swl = IT66121_AUD_SWL_16BIT;
++		break;
++	default:
++		swl = IT66121_AUD_SWL_NOT_INDICATED;
++		break;
++	}
++
++	iec60958_chstat[4] = (((~fs) << 4) & 0xF0) | swl;
++	ret = it661221_set_chstat(ctx, iec60958_chstat);
++	if (ret) {
++		dev_err(dev, "Failed to set channel status: %d\n", ret);
++		goto out;
++	}
++
++	// Enable audio channel enable while input clock stable (if SPDIF).
++	ret = it661221_audio_ch_enable(ctx, true);
++	if (ret) {
++		dev_err(dev, "Failed to enable audio channel: %d\n", ret);
++		goto out;
++	}
++
++	ret = regmap_write_bits(ctx->regmap, IT66121_INT_MASK1_REG,
++				IT66121_INT_MASK1_AUD_OVF,
++				0);
++	if (ret)
++		goto out;
++
++	dev_dbg(dev, "HDMI audio enabled.\n");
++out:
++	mutex_unlock(&ctx->lock);
++
++	return ret;
++}
++
++static int it66121_audio_startup(struct device *dev, void *data)
++{
++	int ret;
++	struct it66121 *ctx = dev_get_drvdata(dev);
++
++	dev_dbg(dev, "%s\n", __func__);
++
++	mutex_lock(&ctx->lock);
++	ret = it661221_audio_output_enable(ctx, true);
++	if (ret)
++		dev_err(dev, "Failed to enable audio output: %d\n", ret);
++
++	mutex_unlock(&ctx->lock);
++
++	return ret;
++}
++
++static void it66121_audio_shutdown(struct device *dev, void *data)
++{
++	int ret;
++	struct it66121 *ctx = dev_get_drvdata(dev);
++
++	dev_dbg(dev, "%s\n", __func__);
++
++	mutex_lock(&ctx->lock);
++	ret = it661221_audio_output_enable(ctx, false);
++	if (ret)
++		dev_err(dev, "Failed to disable audio output: %d\n", ret);
++
++	mutex_unlock(&ctx->lock);
++}
++
++static int it66121_audio_get_eld(struct device *dev, void *data,
++				 u8 *buf, size_t len)
++{
++	struct it66121 *ctx = dev_get_drvdata(dev);
++
++	mutex_lock(&ctx->lock);
++
++	memcpy(buf, ctx->connector.eld,
++	       min(sizeof(ctx->connector.eld), len));
++
++	mutex_unlock(&ctx->lock);
++
++	return 0;
++}
++
++static const struct hdmi_codec_ops it66121_audio_codec_ops = {
++	.hw_params = it66121_audio_hw_params,
++	.audio_startup = it66121_audio_startup,
++	.audio_shutdown = it66121_audio_shutdown,
++	.get_eld = it66121_audio_get_eld,
++};
++
++static int it66121_audio_codec_init(struct it66121 *ctx, struct device *dev)
++{
++	struct hdmi_codec_pdata codec_data = {
++		.ops = &it66121_audio_codec_ops,
++		.i2s = 1, /* Only i2s support for now */
++		.spdif = 0,
++		.max_i2s_channels = 8,
++	};
++
++	dev_dbg(dev, "%s\n", __func__);
++
++	if (!of_property_read_bool(dev->of_node, "#sound-dai-cells")) {
++		dev_info(dev, "No \"#sound-dai-cells\", no audio\n");
++		return 0;
++	}
++
++	ctx->audio.pdev = platform_device_register_data(dev,
++							HDMI_CODEC_DRV_NAME,
++							PLATFORM_DEVID_AUTO,
++							&codec_data,
++							sizeof(codec_data));
++
++	if (IS_ERR(ctx->audio.pdev)) {
++		dev_err(dev, "Failed to initialize HDMI audio codec: %d\n",
++			PTR_ERR_OR_ZERO(ctx->audio.pdev));
++	}
++
++	return PTR_ERR_OR_ZERO(ctx->audio.pdev);
++}
++
++int it66121_parse_dt(struct device_node *np, struct it66121 *ctx)
++{
++	of_property_read_u32(np, "bus-width", &ctx->bus_width);
++
++	if (ctx->bus_width != 12 && ctx->bus_width != 24)
++		return -EINVAL;
++
++	ctx->host_node = of_graph_get_remote_node(np, 0, 0);
++	if (!ctx->host_node)
++		return -ENODEV;
++
++	of_node_put(ctx->host_node);
++
++	/* TODO: Check if these need to be parsed by DT or not */
++	ctx->rgb = true;
++	ctx->embedded_sync = false;
++
++	return 0;
++}
++
++static int it66121_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
++{
++	struct it66121_link_config link_config;
++
++	u32 revision_id, vendor_ids[2] = { 0 }, device_ids[2] = { 0 };
++	struct it66121 *it66121;
++	struct device *dev = &i2c->dev;
++	int ret;
++
++	if (!dev->of_node)
++		return -EINVAL;
++
++	if (!i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
++		dev_err(dev, "I2C check functionality failed.\n");
++		return -ENXIO;
++	}
++
++	it66121 = devm_kzalloc(dev, sizeof(*it66121), GFP_KERNEL);
++	if (!it66121)
++		return -ENOMEM;
++
++	pit66121 = it66121;
++
++	it66121->i2c_main = i2c;
++	it66121->powered = false;
++	it66121->status = connector_status_disconnected;
++
++	if (dev->of_node) {
++		it66121->type = (enum it66121_type)of_device_get_match_data(dev);
++
++	}
++	else {
++		it66121->type = id->driver_data;
++	}
++
++	ret = it66121_parse_dt(dev->of_node, it66121);
++	if (ret)
++		return ret;
++
++	i2c_set_clientdata(i2c, it66121);
++	mutex_init(&it66121->lock);
++
++	it66121->supplies[0].supply = "vcn33";
++	it66121->supplies[1].supply = "vcn18";
++	it66121->supplies[2].supply = "vrf12";
++	it66121->num_supplies = 3;
++	ret = devm_regulator_bulk_get( &it66121->i2c_main->dev, it66121->num_supplies, it66121->supplies);
++	if (ret) {
++//		dev_err(it66121->i2c_main->dev, "regulator_bulk failed\n");
++		return ret;
++	}
++
++	it66121_power_on( it66121 );
++
++	it66121->regmap = devm_regmap_init_i2c(i2c, &it66121_regmap_config);
++	if (IS_ERR(it66121->regmap)) {
++		it66121_power_off(it66121);
++		return PTR_ERR(it66121->regmap);
++	}
++
++	regmap_read(it66121->regmap, IT66121_VENDOR_ID0_REG, &vendor_ids[0]);
++	regmap_read(it66121->regmap, IT66121_VENDOR_ID1_REG, &vendor_ids[1]);
++	regmap_read(it66121->regmap, IT66121_DEVICE_ID0_REG, &device_ids[0]);
++	regmap_read(it66121->regmap, IT66121_DEVICE_ID1_REG, &device_ids[1]);
++
++	/* Revision is shared with DEVICE_ID1 */
++	revision_id = FIELD_GET(IT66121_REVISION_MASK, device_ids[1]);
++	device_ids[1] &= IT66121_DEVICE_ID1_MASK;
++
++	if (vendor_ids[0] != IT66121_VENDOR_ID0 || vendor_ids[1] != IT66121_VENDOR_ID1 ||
++	    device_ids[0] != IT66121_DEVICE_ID0 || device_ids[1] != IT66121_DEVICE_ID1) {
++		it66121_power_off(it66121);
++		return -ENODEV;
++	}
++
++	it66121_set_link_config(it66121, &link_config);
++
++	it66121->bridge.funcs = &it66121_bridge_funcs;
++	it66121->bridge.of_node = dev->of_node;
++
++	if( i2c->irq )
++		ret = devm_request_threaded_irq(dev, i2c->irq, NULL, it66121_irq_threaded_handler,
++					IRQF_ONESHOT, dev_name(dev), it66121);
++	if (ret < 0) {
++		dev_err(dev, "Failed to request irq %d:%d\n", i2c->irq, ret);
++		it66121_power_off(it66121);
++		return ret;
++	}
++
++	it66121_audio_codec_init(it66121, dev);
++
++	drm_bridge_add(&it66121->bridge);
++
++	dev_info( &it66121->i2c_main->dev, "IT66121 revision %d probed\n", revision_id);
++
++	return 0;
++}
++
++static int it66121_remove(struct i2c_client *i2c)
++{
++	struct it66121 *it66121 = i2c_get_clientdata(i2c);
++
++	i2c_unregister_device(it66121->i2c_cec);
++	if (it66121->cec_clk)
++		clk_disable_unprepare(it66121->cec_clk);
++
++	drm_bridge_remove(&it66121->bridge);
++
++//	it66121_audio_exit(it66121);
++
++	cec_unregister_adapter(it66121->cec_adap);
++
++	i2c_unregister_device(it66121->i2c_packet);
++	i2c_unregister_device(it66121->i2c_edid);
++
++	return 0;
++}
++
++static const struct of_device_id it66121_dt_match[] = {
++	{ .compatible = "ite,it66121" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, it66121_dt_match);
++
++static const struct i2c_device_id it66121_id[] = {
++	{ "it66121", 0 },
++	{ }
++};
++MODULE_DEVICE_TABLE(i2c, it66121_id);
++
++static struct i2c_driver it66121_driver = {
++	.driver = {
++		.name	= "it66121",
++		.of_match_table = it66121_dt_match,
++	},
++	.probe = it66121_probe,
++	.remove = it66121_remove,
++	.id_table = it66121_id,
++};
++
++module_i2c_driver(it66121_driver);
++
++
++MODULE_AUTHOR("Simon Chiang");
++MODULE_DESCRIPTION("IT66121 HDMI transmitter driver");
++MODULE_LICENSE("GPL v2");
+-- 
+2.17.1
+
