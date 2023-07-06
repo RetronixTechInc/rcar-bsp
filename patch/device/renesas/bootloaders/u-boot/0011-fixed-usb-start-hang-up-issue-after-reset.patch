@@ -1,0 +1,26 @@
+From 23e4ba5a4796a4665d43e03fbd2191ca76c65051 Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Thu, 6 Jul 2023 16:24:37 +0800
+Subject: [PATCH] fixed usb start hang-up issue after reset.
+
+---
+ drivers/usb/host/xhci-rcar.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/usb/host/xhci-rcar.c b/drivers/usb/host/xhci-rcar.c
+index f2e91ef0fe..c880cd26cc 100644
+--- a/drivers/usb/host/xhci-rcar.c
++++ b/drivers/usb/host/xhci-rcar.c
+@@ -88,7 +88,8 @@ static int xhci_rcar_probe(struct udevice *dev)
+ 		dev_err(dev, "Failed to enable USB3 clock\n");
+ 		goto err_clk;
+ 	}
+-
++	udelay(80);	//wait clock stable minimum 40us.
++	
+ 	ctx->hcd = (struct xhci_hccr *)plat->hcd_base;
+ 	len = HC_LENGTH(xhci_readl(&ctx->hcd->cr_capbase));
+ 	hcor = (struct xhci_hcor *)((uintptr_t)ctx->hcd + len);
+-- 
+2.25.1
+
