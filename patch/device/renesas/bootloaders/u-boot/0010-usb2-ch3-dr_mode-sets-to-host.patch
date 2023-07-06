@@ -1,0 +1,25 @@
+From 917ddbd7afdd9b3c72eae56cd700f0bdabe00c4e Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Thu, 6 Jul 2023 15:20:20 +0800
+Subject: [PATCH] usb2 ch3 dr_mode sets to host.
+
+---
+ arch/arm/dts/r8a7795-salvator-x-u-boot.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/dts/r8a7795-salvator-x-u-boot.dts b/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
+index e97231207b..ded5ea30c3 100644
+--- a/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
++++ b/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
+@@ -610,7 +610,7 @@
+ 	pinctrl-0 = <&usb3_pins>;
+ 	pinctrl-names = "default";
+ 
+-	dr_mode = "org";
++	dr_mode = "host";
+ 	status = "okay";
+ };
+ 
+-- 
+2.25.1
+
