@@ -1,0 +1,186 @@
+From b667d2b1cf1f0e4a2d6afc4d831f75a018c63113 Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Thu, 6 Jul 2023 14:30:15 +0800
+Subject: [PATCH] usb phy support dr_mode tag.
+
+---
+ arch/arm/dts/r8a7795-salvator-x-u-boot.dts | 11 +++--
+ cmd/usb.c                                  |  8 ----
+ drivers/phy/phy-rcar-gen3.c                |  7 ++++
+ drivers/usb/gadget/rcar/phy.c              | 48 +++++++++++++++++++++-
+ 4 files changed, 59 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm/dts/r8a7795-salvator-x-u-boot.dts b/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
+index ed9d985e23..e97231207b 100644
+--- a/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
++++ b/arch/arm/dts/r8a7795-salvator-x-u-boot.dts
+@@ -549,12 +549,10 @@
+ };
+ 
+ &ehci0 {
+-	/* dr_mode = "otg"; */
+ 	status = "okay";
+ };
+ 
+ &hsusb {
+-	/* dr_mode = "otg"; */
+ 	status = "okay";
+ };
+ 
+@@ -562,7 +560,7 @@
+ 	pinctrl-0 = <&usb0_pins>;
+ 	pinctrl-names = "default";
+ 
+-	/* dr_mode = "otg"; */
++	dr_mode = "otg";
+ 	status = "okay";
+ };
+ 
+@@ -605,13 +603,14 @@
+ };
+ 
+ &hsusb3 {
+-	status = "disabled";
++	status = "okay";
+ };
+ 
+ &usb2_phy3 {
+-	/*pinctrl-0 = <&usb3_pins>;
+-	pinctrl-names = "default";*/
++	pinctrl-0 = <&usb3_pins>;
++	pinctrl-names = "default";
+ 
++	dr_mode = "org";
+ 	status = "okay";
+ };
+ 
+diff --git a/cmd/usb.c b/cmd/usb.c
+index bbb32a3447..8c545e80ab 100644
+--- a/cmd/usb.c
++++ b/cmd/usb.c
+@@ -584,11 +584,6 @@ static void do_usb_start(void)
+ {
+ 	bootstage_mark_name(BOOTSTAGE_ID_USB_START, "usb_start");
+ 
+-	/* Tom GPIO Test */
+-	clrsetbits_le32(GPSR6, 0x40000000,	0x00000000); //GP6_30 <=> USB2_CH3_PWEN ; GP6_31 <=> USB2_CH3_OVC
+-	clrsetbits_le32(INOUTSEL6, 0x40000000, 0x40000000); //GP6_30 is output mode.
+-	clrsetbits_le32(OUTDT6, 0x40000000, 0x40000000); //GP6_30 is high.
+-
+ 	if (usb_init() < 0)
+ 		return;
+ 
+@@ -668,9 +663,6 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+ 		if (do_usb_stop_keyboard(0) != 0)
+ 			return 1;
+ 		printf("stopping USB..\n");
+-		
+-		/* Tom USB2CH3 Power off */
+-		clrbits_le32(OUTDT6, 0x40000000); //GP6_30 is low.
+ 
+ 		usb_stop();
+ 		return 0;
+diff --git a/drivers/phy/phy-rcar-gen3.c b/drivers/phy/phy-rcar-gen3.c
+index b662935626..390e2fa924 100644
+--- a/drivers/phy/phy-rcar-gen3.c
++++ b/drivers/phy/phy-rcar-gen3.c
+@@ -17,6 +17,7 @@
+ #include <asm/io.h>
+ #include <linux/bitops.h>
+ #include <power/regulator.h>
++#include <linux/usb/otg.h>
+ 
+ /* USB2.0 Host registers (original offset is +0x200) */
+ #define USB2_INT_ENABLE		0x000
+@@ -55,9 +56,11 @@ struct rcar_gen3_phy {
+ 	struct udevice	*vbus_supply;
+ };
+ 
++void rcar_gen3_device_host_peripheral(unsigned long addr, enum usb_dr_mode dr_mode);
+ static int rcar_gen3_phy_phy_init(struct phy *phy)
+ {
+ 	struct rcar_gen3_phy *priv = dev_get_priv(phy->dev);
++	enum usb_dr_mode dr_mode;
+ 
+ 	/* Initialize USB2 part */
+ 	writel(0, priv->regs + USB2_INT_ENABLE);
+@@ -71,6 +74,10 @@ static int rcar_gen3_phy_phy_init(struct phy *phy)
+ 
+ 	setbits_le32(priv->regs + USB2_ADPCTRL, USB2_ADPCTRL_DRVVBUS);
+ 
++	//phy dr_mode check
++	dr_mode = usb_get_dr_mode(dev_of_offset(phy->dev));
++	rcar_gen3_device_host_peripheral((unsigned long)priv->regs, dr_mode);
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/usb/gadget/rcar/phy.c b/drivers/usb/gadget/rcar/phy.c
+index 56bddd510d..73e456644b 100644
+--- a/drivers/usb/gadget/rcar/phy.c
++++ b/drivers/usb/gadget/rcar/phy.c
+@@ -17,7 +17,7 @@
+ 
+ #include "common.h"
+ #include <asm/io.h>
+-
++#include <linux/usb/otg.h>
+ 
+ /******* USB2.0 Host registers (original offset is +0x200) *******/
+ #define USB2_INT_ENABLE		0x000
+@@ -245,6 +245,52 @@ static struct phy_ops rcar_gen3_phy_usb2_ops = {
+ 	.owner		= THIS_MODULE,
+ };
+ 
++void rcar_gen3_device_host_peripheral(unsigned long addr, enum usb_dr_mode dr_mode)
++{
++	struct rcar_gen3_chan ch;
++	bool is_host = true;
++	u32 val;
++	void __iomem *usb2_base;
++		
++	ch.usb2.base = (void *)addr;
++	usb2_base = ch.usb2.base;
++	
++// otg init
++	val = readl(usb2_base + USB2_VBCTRL);
++	writel(val | USB2_VBCTRL_DRVVBUSSEL, usb2_base + USB2_VBCTRL);
++	
++	writel(USB2_OBINT_BITS, usb2_base + USB2_OBINTSTA);
++	val = readl(usb2_base + USB2_OBINTEN);
++	writel(val | USB2_OBINT_BITS, usb2_base + USB2_OBINTEN);
++	
++	val = readl(usb2_base + USB2_ADPCTRL);
++	writel(val | USB2_ADPCTRL_IDPULLUP, usb2_base + USB2_ADPCTRL);
++	
++	rcar_gen3_set_linectrl(&ch, 0, 0);
++	val = readl(usb2_base + USB2_LINECTRL1);
++	writel(val | USB2_LINECTRL1_DPRPD_EN | USB2_LINECTRL1_DMRPD_EN,
++	       usb2_base + USB2_LINECTRL1);
++
++	//~ /* B-device? */
++	if(dr_mode == USB_DR_MODE_HOST)
++	{
++		is_host = true;
++	}
++	else if(dr_mode == USB_DR_MODE_PERIPHERAL)
++	{
++		is_host = false;
++	}
++	else if (rcar_gen3_check_id(&ch) && rcar_gen3_check_vbus(&ch))
++	{
++		is_host = false;
++	}
++
++	if (is_host)
++		rcar_gen3_init_for_host(&ch);
++	else
++		rcar_gen3_init_for_peri(&ch);
++}
++
+ static irqreturn_t rcar_gen3_phy_usb2_irq(int irq, void *_ch)
+ {
+ 	struct rcar_gen3_chan *ch = _ch;
+-- 
+2.25.1
+
