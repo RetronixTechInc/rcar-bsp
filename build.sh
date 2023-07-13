@@ -34,6 +34,16 @@ echo "source code exist!"
 export workdirectory=${SCRIPT_DIR}/${WORKDIRECTORY}
 cd ${workdirectory}/work/mydroid
 
+# do patch only
+if [ "$1" = "do_patch" ]; then
+	#~ patch IVI PCBA.
+	path_file=${SCRIPT_DIR}/patch/patch.sh
+	if [ -f ${path_file} ] && [ -x ${path_file} ]; then
+	${path_file} "${workdirectory}/work/mydroid"
+	fi
+	exit
+fi
+
 else
 
 mkdir -p ${SCRIPT_DIR}/${WORKDIRECTORY}
