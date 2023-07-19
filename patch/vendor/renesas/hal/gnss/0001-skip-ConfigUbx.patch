@@ -1,0 +1,28 @@
+From dbaae7881fe25b163170bd56ebce6f7eeba8a448 Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Wed, 19 Jul 2023 11:50:37 +0800
+Subject: [PATCH] skip ConfigUbx()
+
+---
+ 2.0/source/Configurator.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/2.0/source/Configurator.cpp b/2.0/source/Configurator.cpp
+index 920bcef..441bc7e 100644
+--- a/2.0/source/Configurator.cpp
++++ b/2.0/source/Configurator.cpp
+@@ -87,7 +87,11 @@ CError Configurator::Config() {
+     }
+ 
+     if (GnssVendor::Ublox == mReceiver->GetVendorId()) {
++#if 0
+         return ConfigUbx();
++#else//artietest
++        return CError::Success;
++#endif
+     }
+ 
+     return CError::Success;
+-- 
+2.25.1
+
