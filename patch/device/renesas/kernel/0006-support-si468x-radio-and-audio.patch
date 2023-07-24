@@ -1,0 +1,188 @@
+From bb3f04913c1e433f682c4ebf7f0e990ff59c89b8 Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Mon, 24 Jul 2023 11:01:01 +0800
+Subject: [PATCH] support si468x radio and audio
+
+---
+ .../renesas/r8a7795-salvator-xs-android.dts   | 68 +++++++++++++++----
+ arch/arm64/configs/android_salvator_defconfig |  7 ++
+ 2 files changed, 63 insertions(+), 12 deletions(-)
+ mode change 100755 => 100644 arch/arm64/configs/android_salvator_defconfig
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+index 6fc3a59a7f2e..5e0fc5dd7432 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+@@ -15,6 +15,8 @@
+ #include <dt-bindings/input/linux-event-codes.h>
+ #include "r8a7795.dtsi"
+ 
++#define USB_PIN_ON_SSI
++
+ / {
+ 	model = "Retronix IVI board based on r8a7795 ES3.0+ with 16GiB (4x4 GiB)";
+ 	compatible = "renesas,salvator-xs", "renesas,r8a7795";
+@@ -283,16 +285,39 @@
+ 		enable-active-high;
+ 	};
+ 
+-	sound_card: sound {
+-		compatible = "audio-graph-scu-card";
+-
+-		label = "rcar-sound";
+-
+-		prefix = "ak4613";
+-        routing = "ak4613 Playback", "DAI0 Playback",
+-				"DAI0 Capture", "ak4613 Capture";
++	sound_card: sound@0 {
++		compatible = "audio-graph-card";
++		label = "ak4613";
+         dais = <&rsnd_port0>;
+ 	};
++	
++	sound_radio: sound@3 {
++        compatible = "audio-graph-card";
++        label = "radio";
++        dais = <&rsnd_port3>;
++	};
++
++	radio: si468x@0 {
++        compatible = "si,si468x-pcm";
++        port {
++            si468x_endpoint: endpoint {
++				remote-endpoint = <&rsnd_endpoint3>;
++				system-clock-frequency = <12288000>;
++            };
++        };
++	};
++	
++	sound_hdmi0: sound@1 {
++        compatible = "audio-graph-card";
++        label = "hdmi0";
++        dais = <&rsnd_port1>;
++	};
++	
++	sound_hdmi1: sound@2 {
++        compatible = "audio-graph-card";
++        label = "hdmi1";
++        dais = <&rsnd_port2>;
++	};
+ 
+ 	cvbs-in {
+ 		compatible = "composite-video-connector";
+@@ -611,7 +636,12 @@
+ 	};
+ 
+ 	sound_pins: sound {
++#ifdef USB_PIN_ON_SSI
++		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a", 
++				"ssi6_ctrl", "ssi6_data";
++#else
+ 		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a";
++#endif
+ 		function = "ssi";
+ 	};
+ 
+@@ -877,8 +907,8 @@
+ 	pinctrl-0 = <&sound_pins &sound_clk_pins>;
+ 	pinctrl-names = "default";
+ 
+-	/* Single DAI */
+-	#sound-dai-cells = <0>;
++	/* Single DAI = 0 ; Multiple DAI = 1 */
++	#sound-dai-cells = <1>;
+ 
+ 	/* audio_clkout0/1/2/3 */
+ 	#clock-cells = <1>;
+@@ -926,6 +956,18 @@
+ 				playback = <&ssi3>;
+ 			};
+ 		};
++		rsnd_port3: port@3 {
++            reg = <3>;
++            rsnd_endpoint3: endpoint {
++				remote-endpoint = <&si468x_endpoint>;
++				
++				dai-format = "i2s";
++				bitclock-master = <&rsnd_endpoint3>;
++				frame-master = <&rsnd_endpoint3>;
++				
++                capture = <&ssi6>;
++            };
++        };
+ 	};
+ };
+ 
+@@ -984,9 +1026,10 @@
+ };
+ 
+ &usb2_phy2 {
++#ifndef USB_PIN_ON_SSI
+ 	pinctrl-0 = <&usb2_pins>;
+ 	pinctrl-names = "default";
+-
++#endif
+ 	status = "okay";
+ };
+ 
+@@ -1080,7 +1123,7 @@
+ 		ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			ak4613_endpoint4: endpoint@4 {
++			ak4613_endpoint4: port@4 {
+ 				reg = <4>;
+ 				remote-endpoint = <&rsnd_endpoint0>;
+ 			};
+@@ -1143,6 +1186,7 @@
+ 		compatible = "si4689";
+ 		reg = <0x65>;
+ 
++		reset_gpio = <&gpio5 20 GPIO_ACTIVE_HIGH>;
+ 		interrupt-parent = <&gpio5>;
+ 		interrupts = <17 IRQ_TYPE_EDGE_FALLING>;
+ 	};
+diff --git a/arch/arm64/configs/android_salvator_defconfig b/arch/arm64/configs/android_salvator_defconfig
+old mode 100755
+new mode 100644
+index 376c5861d002..1f56f5b9f91f
+--- a/arch/arm64/configs/android_salvator_defconfig
++++ b/arch/arm64/configs/android_salvator_defconfig
+@@ -369,6 +369,7 @@ CONFIG_REGULATOR_GPIO=y
+ # CONFIG_RC_CORE is not set
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_MEDIA_RADIO_SUPPORT=y
+ CONFIG_MEDIA_CONTROLLER=y
+ CONFIG_VIDEO_V4L2_SUBDEV_API=y
+ CONFIG_VIDEO_ADV_DEBUG=y
+@@ -384,6 +385,8 @@ CONFIG_V4L_MEM2MEM_DRIVERS=y
+ CONFIG_VIDEO_RENESAS_FDP1=y
+ CONFIG_VIDEO_RENESAS_FCP=y
+ CONFIG_VIDEO_RENESAS_VSP1=y
++CONFIG_RADIO_SI4689=y
++CONFIG_I2C_SI4689=m
+ # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+ CONFIG_VIDEO_ADV748X=y
+ CONFIG_DRM=y
+@@ -392,6 +395,8 @@ CONFIG_DRM_RCAR_DW_HDMI=y
+ CONFIG_DRM_RCAR_LVDS=y
+ CONFIG_DRM_PANEL_LVDS=y
+ CONFIG_DRM_DUMB_VGA_DAC=y
++CONFIG_DRM_I2C_ADV7511=y
++CONFIG_DRM_I2C_ADV7511_AUDIO=y
+ CONFIG_DRM_DW_HDMI_CEC=y
+ CONFIG_DRM_ITE_IT66121=y
+ CONFIG_DRM_ITE_IT6263=y
+@@ -407,6 +412,8 @@ CONFIG_SND=y
+ CONFIG_SND_SOC=y
+ CONFIG_SND_SOC_RCAR=y
+ CONFIG_SND_SOC_AK4613=y
++CONFIG_SND_SOC_SI468X=y
++CONFIG_SND_SOC_HDMI_CODEC=y
+ CONFIG_HIDRAW=y
+ CONFIG_UHID=y
+ CONFIG_HID_MULTITOUCH=y
+-- 
+2.25.1
+
