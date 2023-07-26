@@ -1,0 +1,227 @@
+From d1d7142eeb0a0c85464482ad571cdeee43a7fa04 Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Wed, 26 Jul 2023 16:08:22 +0800
+Subject: [PATCH] 1.modify dr_mode behavior 2.add ignore_oc
+
+---
+ .../renesas/r8a7795-salvator-xs-android.dts   | 21 +++++++---
+ drivers/phy/renesas/phy-rcar-gen3-usb2.c      | 40 +++++++++++++++++--
+ 2 files changed, 52 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+index 5e0fc5dd7432..fdeb0f99a3fa 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+@@ -15,7 +15,7 @@
+ #include <dt-bindings/input/linux-event-codes.h>
+ #include "r8a7795.dtsi"
+ 
+-#define USB_PIN_ON_SSI
++#define SSI6_USE_USB2_PINS
+ 
+ / {
+ 	model = "Retronix IVI board based on r8a7795 ES3.0+ with 16GiB (4x4 GiB)";
+@@ -636,7 +636,7 @@
+ 	};
+ 
+ 	sound_pins: sound {
+-#ifdef USB_PIN_ON_SSI
++#ifdef SSI6_USE_USB2_PINS
+ 		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a", 
+ 				"ssi6_ctrl", "ssi6_data";
+ #else
+@@ -994,6 +994,7 @@
+ 	pinctrl-0 = <&usb0_pins>;
+ 	pinctrl-names = "default";
+ 
++	rcar-ignore-oc;
+ 	status = "okay";
+ };
+ 
+@@ -1003,10 +1004,12 @@
+ };
+ 
+ &ohci1 {
++	dr_mode = "host";
+ 	status = "okay";
+ };
+ 
+ &ehci1 {
++	dr_mode = "host";
+ 	status = "okay";
+ };
+ 
+@@ -1014,32 +1017,37 @@
+ 	pinctrl-0 = <&usb1_pins>;
+ 	pinctrl-names = "default";
+ 
++	rcar-ignore-oc;
+ 	status = "okay";
+ };
+ 
+ &ohci2 {
++	dr_mode = "host";
+ 	status = "okay";
+ };
+ 
+ &ehci2 {
++	dr_mode = "host";
++
+ 	status = "okay";
+ };
+ 
+ &usb2_phy2 {
+-#ifndef USB_PIN_ON_SSI
++#ifndef SSI6_USE_USB2_PINS
+ 	pinctrl-0 = <&usb2_pins>;
+ 	pinctrl-names = "default";
+ #endif
++	rcar-ignore-oc;
+ 	status = "okay";
+ };
+ 
+ &ohci3 {
+-	dr_mode = "otg";
++	dr_mode = "host";
+ 	status = "okay";
+ };
+ 
+ &ehci3 {
+-	dr_mode = "otg";
++	dr_mode = "host";
+ 	status = "okay";
+ };
+ 
+@@ -1047,11 +1055,12 @@
+ 	pinctrl-0 = <&usb2_ch3_pins>;
+ 	pinctrl-names = "default";
+ 
++//	rcar-ignore-oc; //no need ignore, it has external pullup
+ 	status = "okay";
+ };
+ 
+ &hsusb3 {
+-	dr_mode = "otg";
++	dr_mode = "host";
+ 	status = "okay";
+ };
+ 
+diff --git a/drivers/phy/renesas/phy-rcar-gen3-usb2.c b/drivers/phy/renesas/phy-rcar-gen3-usb2.c
+index 0d03c5d63afd..404c1e2bc9d8 100644
+--- a/drivers/phy/renesas/phy-rcar-gen3-usb2.c
++++ b/drivers/phy/renesas/phy-rcar-gen3-usb2.c
+@@ -56,6 +56,7 @@
+ 
+ /* OC_TIMSET */
+ #define USB2_OC_TIMSET_INIT		0x000209ab
++#define USB2_OC_TIMSET_NONE		0
+ 
+ /* COMMCTRL */
+ #define USB2_COMMCTRL_OTG_PERI		BIT(31)	/* 1 = Peripheral mode */
+@@ -85,6 +86,9 @@
+ 
+ #define RCAR_GEN3_PHY_HAS_DEDICATED_PINS	1
+ 
++#define USE_DR_MODE
++#define USE_IGNORE_OC
++
+ struct rcar_gen3_chan {
+ 	void __iomem *base;
+ 	struct extcon_dev *extcon;
+@@ -93,6 +97,12 @@ struct rcar_gen3_chan {
+ 	struct work_struct work;
+ 	bool extcon_host;
+ 	bool has_otg_pins;
++#ifdef USE_DR_MODE
++	enum usb_dr_mode dr_mode;
++#endif
++#ifdef USE_IGNORE_OC
++	u8	rcar_ignore_oc;
++#endif
+ };
+ 
+ static void rcar_gen3_phy_usb2_work(struct work_struct *work)
+@@ -156,7 +166,9 @@ static void rcar_gen3_init_for_host(struct rcar_gen3_chan *ch)
+ 	rcar_gen3_enable_vbus_ctrl(ch, 1);
+ 
+ 	ch->extcon_host = true;
++#ifndef USE_DR_MODE
+ 	schedule_work(&ch->work);
++#endif
+ }
+ 
+ static void rcar_gen3_init_for_peri(struct rcar_gen3_chan *ch)
+@@ -166,7 +178,9 @@ static void rcar_gen3_init_for_peri(struct rcar_gen3_chan *ch)
+ 	rcar_gen3_enable_vbus_ctrl(ch, 0);
+ 
+ 	ch->extcon_host = false;
++#ifndef USE_DR_MODE
+ 	schedule_work(&ch->work);
++#endif
+ }
+ 
+ static void rcar_gen3_init_for_b_host(struct rcar_gen3_chan *ch)
+@@ -208,6 +222,10 @@ static void rcar_gen3_init_from_a_peri_to_a_host(struct rcar_gen3_chan *ch)
+ 
+ static bool rcar_gen3_check_id(struct rcar_gen3_chan *ch)
+ {
++#ifdef USE_DR_MODE
++	if (!ch->has_otg_pins)
++		return (ch->dr_mode == USB_DR_MODE_HOST) ? false : true;
++#endif
+ 	return !!(readl(ch->base + USB2_ADPCTRL) & USB2_ADPCTRL_IDDIG);
+ }
+ 
+@@ -318,13 +336,20 @@ static int rcar_gen3_phy_usb2_init(struct phy *p)
+ 	/* Initialize USB2 part */
+ 	writel(USB2_INT_ENABLE_INIT, usb2_base + USB2_INT_ENABLE);
+ 	writel(USB2_SPD_RSM_TIMSET_INIT, usb2_base + USB2_SPD_RSM_TIMSET);
+-	writel(USB2_OC_TIMSET_INIT, usb2_base + USB2_OC_TIMSET);
++#ifdef USE_IGNORE_OC
++	if( channel->rcar_ignore_oc )
++		writel(USB2_OC_TIMSET_NONE, usb2_base + USB2_OC_TIMSET);
++	else
++#endif
++		writel(USB2_OC_TIMSET_INIT, usb2_base + USB2_OC_TIMSET);
+ 	val = readl(usb2_base + USB2_VBCTRL);
+ 	val &= ~USB2_VBCTRL_OCCLREN;
+ 	writel(val, usb2_base + USB2_VBCTRL);
+ 
+ 	/* Initialize otg part */
++#ifndef USE_DR_MODE
+ 	if (channel->has_otg_pins)
++#endif
+ 		rcar_gen3_init_otg(channel);
+ 
+ 	return 0;
+@@ -461,8 +486,12 @@ static int rcar_gen3_phy_usb2_probe(struct platform_device *pdev)
+ 		if (irq < 0)
+ 			dev_err(dev, "No irq handler (%d)\n", irq);
+ 	}
+-
++#ifdef USE_DR_MODE
++	channel->dr_mode = of_usb_get_dr_mode_by_phy(dev->of_node, 0);
++	if (channel->dr_mode == USB_DR_MODE_OTG) {
++#else
+ 	if (of_usb_get_dr_mode_by_phy(dev->of_node, 0) == USB_DR_MODE_OTG) {
++#endif
+ 		int ret;
+ 
+ 		channel->has_otg_pins = (uintptr_t)of_device_get_match_data(dev);
+@@ -477,7 +506,12 @@ static int rcar_gen3_phy_usb2_probe(struct platform_device *pdev)
+ 			return ret;
+ 		}
+ 	}
+-
++#ifdef USE_IGNORE_OC
++	if (of_property_read_bool(dev->of_node, "rcar-ignore-oc"))
++		channel->rcar_ignore_oc = 1;
++	else
++		channel->rcar_ignore_oc = 0;
++#endif
+ 	/*
+ 	 * devm_phy_create() will call pm_runtime_enable(&phy->dev);
+ 	 * And then, phy-core will manage runtime pm for this device.
+-- 
+2.25.1
+
