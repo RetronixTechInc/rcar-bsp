@@ -1,0 +1,42 @@
+From 2c8c1da2182e07ff35b7d7ed062d9d2f99527e7c Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Wed, 26 Jul 2023 17:21:36 +0800
+Subject: [PATCH] remodify the condition of schedule_work
+
+---
+ drivers/phy/renesas/phy-rcar-gen3-usb2.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/phy/renesas/phy-rcar-gen3-usb2.c b/drivers/phy/renesas/phy-rcar-gen3-usb2.c
+index 404c1e2bc9d8..b803fdfa2426 100644
+--- a/drivers/phy/renesas/phy-rcar-gen3-usb2.c
++++ b/drivers/phy/renesas/phy-rcar-gen3-usb2.c
+@@ -166,9 +166,10 @@ static void rcar_gen3_init_for_host(struct rcar_gen3_chan *ch)
+ 	rcar_gen3_enable_vbus_ctrl(ch, 1);
+ 
+ 	ch->extcon_host = true;
+-#ifndef USE_DR_MODE
+-	schedule_work(&ch->work);
++#ifdef USE_DR_MODE
++	if(ch->has_otg_pins)
+ #endif
++		schedule_work(&ch->work);
+ }
+ 
+ static void rcar_gen3_init_for_peri(struct rcar_gen3_chan *ch)
+@@ -178,9 +179,10 @@ static void rcar_gen3_init_for_peri(struct rcar_gen3_chan *ch)
+ 	rcar_gen3_enable_vbus_ctrl(ch, 0);
+ 
+ 	ch->extcon_host = false;
+-#ifndef USE_DR_MODE
+-	schedule_work(&ch->work);
++#ifdef USE_DR_MODE
++	if(ch->has_otg_pins)
+ #endif
++		schedule_work(&ch->work);
+ }
+ 
+ static void rcar_gen3_init_for_b_host(struct rcar_gen3_chan *ch)
+-- 
+2.25.1
+
