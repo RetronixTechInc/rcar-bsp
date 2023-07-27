@@ -1,0 +1,28 @@
+From 2d20af01734fab503f0f8dcde55efb5f45d444c8 Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Thu, 27 Jul 2023 16:26:31 +0800
+Subject: [PATCH] fix dr_mode show much Call trace msg
+
+---
+ drivers/phy/renesas/phy-rcar-gen3-usb2.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/phy/renesas/phy-rcar-gen3-usb2.c b/drivers/phy/renesas/phy-rcar-gen3-usb2.c
+index b803fdfa2426..89fe1d0dbb7b 100644
+--- a/drivers/phy/renesas/phy-rcar-gen3-usb2.c
++++ b/drivers/phy/renesas/phy-rcar-gen3-usb2.c
+@@ -314,6 +314,11 @@ static void rcar_gen3_init_otg(struct rcar_gen3_chan *ch)
+ 	writel(val | USB2_VBCTRL_DRVVBUSSEL, usb2_base + USB2_VBCTRL);
+ 	writel(USB2_OBINT_BITS, usb2_base + USB2_OBINTSTA);
+ 	val = readl(usb2_base + USB2_OBINTEN);
++#ifdef USE_DR_MODE
++	if (!ch->has_otg_pins)
++		writel(val & ~USB2_OBINT_BITS, usb2_base + USB2_OBINTEN);
++	else
++#endif
+ 	writel(val | USB2_OBINT_BITS, usb2_base + USB2_OBINTEN);
+ 	val = readl(usb2_base + USB2_ADPCTRL);
+ 	writel(val | USB2_ADPCTRL_IDPULLUP, usb2_base + USB2_ADPCTRL);
+-- 
+2.25.1
+
