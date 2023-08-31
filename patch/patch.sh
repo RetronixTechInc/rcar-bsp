@@ -23,7 +23,17 @@ function patch_loop
 			#~ echo "cd ${patch_des}/${2}"
 			echo "git am ${patchs}"
 			
+			if [ ! -d "${patch_des}/${2}" ]; then
+				echo "Create fold ${patch_des}/${2}"
+				mkdir -p "${patch_des}/${2}"
+			fi
 			cd "${patch_des}/${2}"
+			
+			if [ ! -d "${patch_des}/${2}/.git" ]; then
+				echo "Create local git at ${patch_des}/${2}/.git"
+				git init && git add . && git commit -a -m "create git."
+			fi
+			
 			git am "${patchs}"
 		fi
 	fi
