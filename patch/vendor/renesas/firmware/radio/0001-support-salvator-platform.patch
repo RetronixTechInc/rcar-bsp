@@ -1,0 +1,25 @@
+From b93fd92440af9fe886668535380c225cbab8a63c Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Thu, 31 Aug 2023 16:54:50 +0800
+Subject: [PATCH] support salvator platform
+
+---
+ Android.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Android.mk b/Android.mk
+index 07ac475..c9d13ee 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -15,7 +15,7 @@
+ #
+ 
+ # Include only for Kingfisher board
+-ifneq (,$(filter $(TARGET_PRODUCT), kingfisher))
++ifneq (,$(filter $(TARGET_PRODUCT), salvator kingfisher))
+ 
+ LOCAL_PATH:= $(call my-dir)
+ 
+-- 
+2.25.1
+

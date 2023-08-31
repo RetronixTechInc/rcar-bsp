@@ -1,0 +1,118 @@
+From 172e8047bde93ba44b394ca83474e8d4bf897b8e Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Thu, 31 Aug 2023 16:47:19 +0800
+Subject: [PATCH] support radio module
+
+---
+ device.mk                                     | 10 ++++++++++
+ init/init.salvator.rc                         |  3 +++
+ init/ueventd.salvator.rc                      |  1 +
+ modules.mk                                    |  3 +++
+ sepolicy/vendor/file_contexts                 |  4 ++++
+ sepolicy/vendor/hal_broadcastradio_default.te |  4 ++++
+ 6 files changed, 25 insertions(+)
+ create mode 100644 sepolicy/vendor/hal_broadcastradio_default.te
+
+diff --git a/device.mk b/device.mk
+index 603c2fb..0ddc251 100644
+--- a/device.mk
++++ b/device.mk
+@@ -18,6 +18,9 @@ $(call inherit-product, device/renesas/common/DeviceCommon.mk)
+ $(call inherit-product, device/renesas/salvator/modules.mk)
+ 
+ # ----------------------------------------------------------------------
++PRODUCT_COPY_FILES += \
++    frameworks/native/data/etc/android.hardware.broadcastradio.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.broadcastradio.xml
++	
+ PRODUCT_COPY_FILES += \
+     device/renesas/salvator/permissions/privapp-permissions-salvator.xml:$(TARGET_COPY_OUT_ODM)/etc/permissions/privapp-permissions-salvator.xml
+ 
+@@ -32,6 +35,13 @@ PRODUCT_COPY_FILES += \
+ PRODUCT_PACKAGES += \
+     android.hardware.bluetooth@1.0-service.salvator
+ 
++# Baroadcast radio
++PRODUCT_PACKAGES += \
++    android.hardware.broadcastradio@2.0-service.renesas \
++    si46xx_firmware \
++    si_flash
++
++
+ # Touchcreen configuration
+ PRODUCT_COPY_FILES += \
+     device/renesas/salvator/touchscreen_skeleton.idc:$(TARGET_COPY_OUT_ODM)/usr/idc/touchscreen_skeleton.idc
+diff --git a/init/init.salvator.rc b/init/init.salvator.rc
+index 9e4eb1f..8faae38 100644
+--- a/init/init.salvator.rc
++++ b/init/init.salvator.rc
+@@ -33,6 +33,9 @@ on init
+     symlink /sdcard /mnt/sdcard
+     symlink /sdcard /storage/sdcard0
+ 
++on early-init
++    insmod /vendor/lib/modules/radio-i2c-si4689.ko
++	
+ on fs
+     mount_all /vendor/etc/fstab.salvator --early
+ 
+diff --git a/init/ueventd.salvator.rc b/init/ueventd.salvator.rc
+index fadd9fc..dca6f63 100644
+--- a/init/ueventd.salvator.rc
++++ b/init/ueventd.salvator.rc
+@@ -14,6 +14,7 @@
+ /dev/v4l-subdev0                                    0666    media           media
+ /dev/v4l-subdev1                                    0666    media           media
+ /dev/v4l-subdev2                                    0666    media           media
++/dev/radio0                                         0660    system          audio
+ /dev/graphics/fb0                                   0666    system          graphics
+ /dev/tee0                                           0660    system          keystore
+ /dev/teepriv0                                       0660    system          keystore
+diff --git a/modules.mk b/modules.mk
+index cb3bad3..7dca762 100644
+--- a/modules.mk
++++ b/modules.mk
+@@ -18,6 +18,9 @@
+ PRODUCT_OUT         := $(OUT_DIR)/target/product/$(TARGET_PRODUCT)
+ KERNEL_MODULES_OUT  := $(PRODUCT_OUT)/obj/KERNEL_MODULES
+ 
++BOARD_VENDOR_KERNEL_MODULES += \
++	$(KERNEL_MODULES_OUT)/radio-i2c-si4689.ko
++	
+ BOARD_VENDOR_KERNEL_MODULES += \
+ 	$(KERNEL_MODULES_OUT)/usbserial.ko \
+ 	$(KERNEL_MODULES_OUT)/pl2303.ko \
+diff --git a/sepolicy/vendor/file_contexts b/sepolicy/vendor/file_contexts
+index 026cd98..a160b88 100644
+--- a/sepolicy/vendor/file_contexts
++++ b/sepolicy/vendor/file_contexts
+@@ -7,6 +7,9 @@
+ # BT TTY
+ /dev/ttySC1                                                                     u:object_r:tty_device:s0
+ 
++# Broadcast radio device
++/dev/radio0                                                                     u:object_r:input_device:s0
++
+ # Video devices
+ /dev/media0                                                                     u:object_r:video_device:s0
+ /dev/v4l-subdev0                                                                u:object_r:video_device:s0
+@@ -16,6 +19,7 @@
+ # Salvator HALs
+ /vendor/bin/hw/android.hardware.sensors@1.0-service.salvator                    u:object_r:hal_sensors_default_exec:s0
+ /vendor/bin/hw/android.hardware.bluetooth@1.0-service.salvator                  u:object_r:hal_bluetooth_btlinux_exec:s0
++/vendor/bin/hw/android.hardware.broadcastradio@2.0-service.renesas              u:object_r:hal_broadcastradio_default_exec:s0
+ 
+ # Same process HALs installed by platform into /vendor
+ /vendor/lib(64)?/hw/audio.primary.salvator.so                                   u:object_r:same_process_hal_file:s0
+diff --git a/sepolicy/vendor/hal_broadcastradio_default.te b/sepolicy/vendor/hal_broadcastradio_default.te
+new file mode 100644
+index 0000000..f174c23
+--- /dev/null
++++ b/sepolicy/vendor/hal_broadcastradio_default.te
+@@ -0,0 +1,4 @@
++
++allow hal_broadcastradio_default input_device:chr_file { open read ioctl };
++
++allow hal_broadcastradio_default system_server:binder { call transfer };
+-- 
+2.25.1
+
