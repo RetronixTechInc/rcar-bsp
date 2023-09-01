@@ -1,0 +1,33 @@
+From 84d1418f8c158e55b593a597abdcb9db29a88ae2 Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Fri, 1 Sep 2023 15:10:29 +0800
+Subject: [PATCH] support bt.
+
+Change-Id: I82b0e937f495983fc7682a75b2f381b659c074cb
+---
+ bluetooth/1.0/default/vendor_interface.cc | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/bluetooth/1.0/default/vendor_interface.cc b/bluetooth/1.0/default/vendor_interface.cc
+index d56e344e7..b375a7cc7 100644
+--- a/bluetooth/1.0/default/vendor_interface.cc
++++ b/bluetooth/1.0/default/vendor_interface.cc
+@@ -206,11 +206,14 @@ bool VendorInterface::Open(InitializeCompleteCallback initialize_complete_cb,
+   }
+ 
+   // Get the local BD address
+-
++  uint8_t local_bda[BluetoothAddress::kBytes] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
++/*
+   uint8_t local_bda[BluetoothAddress::kBytes];
+   if (!BluetoothAddress::get_local_address(local_bda)) {
+     LOG_ALWAYS_FATAL("%s: No Bluetooth Address!", __func__);
+   }
++*/
++
+   int status = lib_interface_->init(&lib_callbacks, (unsigned char*)local_bda);
+   if (status) {
+     ALOGE("%s unable to initialize vendor library: %d", __func__, status);
+-- 
+2.25.1
+

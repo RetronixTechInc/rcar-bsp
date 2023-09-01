@@ -1,0 +1,64 @@
+From f2ad598433af266373ce5a31c5f7c4c3b2e0050f Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Tue, 29 Aug 2023 09:25:26 +0800
+Subject: [PATCH] support wifi
+
+Change-Id: Ic8689374fcdd787d0dc59382631864335a0f771d
+---
+ wpa_supplicant/android.config | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/wpa_supplicant/android.config b/wpa_supplicant/android.config
+index b9b5d9d6..d25a06fc 100644
+--- a/wpa_supplicant/android.config
++++ b/wpa_supplicant/android.config
+@@ -272,7 +272,7 @@ CONFIG_L2_PACKET=linux
+ 
+ # IEEE 802.11w (management frame protection), also known as PMF
+ # Driver support is also needed for IEEE 802.11w.
+-CONFIG_IEEE80211W=y
++#CONFIG_IEEE80211W=y
+ 
+ # Support Operating Channel Validation
+ #CONFIG_OCV=y
+@@ -440,7 +440,7 @@ CONFIG_ANDROID_LOG=y
+ CONFIG_NO_RANDOM_POOL=y
+ 
+ # IEEE 802.11n (High Throughput) support (mainly for AP mode)
+-CONFIG_IEEE80211N=y
++#CONFIG_IEEE80211N=y
+ 
+ # IEEE 802.11ac (Very High Throughput) support (mainly for AP mode)
+ # (depends on CONFIG_IEEE80211N)
+@@ -507,10 +507,13 @@ CONFIG_WIFI_DISPLAY=y
+ #CONFIG_FST=y
+ 
+ # Support Multi Band Operation
+-#CONFIG_MBO=y
++CONFIG_MBO=y
+ 
+ # Fast Initial Link Setup (FILS) (IEEE 802.11ai)
+-#CONFIG_FILS=y
++CONFIG_FILS=y
++
++# EAP Re-authentication protocol
++CONFIG_ERP=y
+ 
+ # Support RSN on IBSS networks
+ # This is needed to be able to use mode=1 network profile with proto=RSN and
+@@ -549,4 +552,12 @@ CONFIG_SAE=y
+ CONFIG_SUITEB=y
+ CONFIG_SUITEB192=y
+ 
++# Wired equivalent privacy (WEP)
++# WEP is an obsolete cryptographic data confidentiality algorithm that is not
++# considered secure. It should not be used for anything anymore. The
++# functionality needed to use WEP is available in the current wpa_supplicant
++# release under this optional build parameter. This functionality is subject to
++# be completely removed in a future release.
++CONFIG_WEP=y
++
+ include $(wildcard $(LOCAL_PATH)/android_config_*.inc)
+-- 
+2.25.1
+

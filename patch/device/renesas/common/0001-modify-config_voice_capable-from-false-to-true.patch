@@ -1,0 +1,25 @@
+From 81260e68791e95f9629bad811492a83874a39012 Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Tue, 29 Aug 2023 09:00:28 +0800
+Subject: [PATCH] modify config_voice_capable from false to true
+
+---
+ overlay/frameworks/base/core/res/res/values/config.xml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/overlay/frameworks/base/core/res/res/values/config.xml b/overlay/frameworks/base/core/res/res/values/config.xml
+index 2a157fd..0754243 100644
+--- a/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -104,7 +104,7 @@
+     <string name="config_dataUsageSummaryComponent">com.android.car.settings/com.android.car.settings.datausage.DataWarningAndLimitActivity</string>
+ 
+      <!-- Flag indicating whether the current device is "voice capable". -->
+-    <bool name="config_voice_capable">false</bool>
++    <bool name="config_voice_capable">true</bool>
+     <!-- Default supported concurrent socket keepalive slots per transport type, used by
+     ConnectivityManager.createSocketKeepalive() for calculating the number of keepalive
+     offload slots that should be reserved for privileged access. This string array should be
+-- 
+2.25.1
+

@@ -19,22 +19,22 @@ function patch_loop
 			patch_loop ${patch_path} ${patch_fd} ${patch}
 		done
 	else
+		if [ ! -d "${patch_des}/${2}" ]; then
+			echo "Create fold ${patch_des}/${2}"
+			mkdir -p "${patch_des}/${2}"
+		fi
+		
+		cd "${patch_des}/${2}"
 		if [[ ${patchs} == *.patch ]]; then
-			#~ echo "cd ${patch_des}/${2}"
 			echo "git am ${patchs}"
-			
-			if [ ! -d "${patch_des}/${2}" ]; then
-				echo "Create fold ${patch_des}/${2}"
-				mkdir -p "${patch_des}/${2}"
-			fi
-			cd "${patch_des}/${2}"
-			
 			if [ ! -d "${patch_des}/${2}/.git" ]; then
 				echo "Create local git at ${patch_des}/${2}/.git"
 				git init && git add . && git commit -a -m "create git."
 			fi
-			
 			git am "${patchs}"
+		else
+			echo "copy ${patchs} to ${patch_des}/${2}"
+			cp "${patchs}" "${patch_des}/${2}/"
 		fi
 	fi
 }

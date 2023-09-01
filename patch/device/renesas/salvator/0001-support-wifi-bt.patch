@@ -1,0 +1,387 @@
+From 6eab28df3d14d9f24f1214143a0a5ea08297d80e Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Fri, 1 Sep 2023 13:08:07 +0800
+Subject: [PATCH] support wifi/bt.
+
+---
+ BoardConfig.mk                                | 16 +++++++++-
+ device.mk                                     | 19 +++++++++---
+ early.init.cfg                                |  4 +++
+ init/init.insmod.sh                           | 29 +++++++++++++++++++
+ init/init.salvator.rc                         | 25 +++++++++++-----
+ init/init.salvator.usb.rc                     |  2 +-
+ manifest.xml                                  |  9 ++++++
+ modules.mk                                    |  5 ++++
+ .../apps/Bluetooth/res/values/config.xml      | 24 ---------------
+ sepolicy/init-insmod-sh.te                    | 18 ++++++++++++
+ sepolicy/property.te                          |  1 +
+ sepolicy/vendor/file_contexts                 |  7 ++++-
+ sepolicy/vendor/hal_bluetooth_default.te      |  9 ++++++
+ sepolicy/vendor/property_contexts             |  1 +
+ wifi/p2p_supplicant.conf                      |  7 +++++
+ wifi/wpa_supplicant.conf                      |  7 +++++
+ 16 files changed, 144 insertions(+), 39 deletions(-)
+ create mode 100644 early.init.cfg
+ create mode 100644 init/init.insmod.sh
+ delete mode 100644 overlay/packages/apps/Bluetooth/res/values/config.xml
+ create mode 100644 sepolicy/init-insmod-sh.te
+ create mode 100644 sepolicy/property.te
+ create mode 100644 sepolicy/vendor/hal_bluetooth_default.te
+ create mode 100644 sepolicy/vendor/property_contexts
+ create mode 100644 wifi/p2p_supplicant.conf
+ create mode 100644 wifi/wpa_supplicant.conf
+
+diff --git a/BoardConfig.mk b/BoardConfig.mk
+index 0a81145..ac94e41 100644
+--- a/BoardConfig.mk
++++ b/BoardConfig.mk
+@@ -19,7 +19,19 @@ TARGET_BOOTLOADER_BOARD_NAME := salvator-x
+ include device/renesas/common/BoardConfigCommon.mk
+ 
+ # Wi-Fi
+-BOARD_WIFI_VENDOR := realtek
++BOARD_WIFI_VENDOR := nxp
++
++ifeq ($(BOARD_WIFI_VENDOR), nxp)
++    BOARD_HAVE_BLUETOOTH_NXP := true
++    WPA_SUPPLICANT_VERSION := VER_0_8_X
++    BOARD_WPA_SUPPLICANT_DRIVER := NL80211
++    BOARD_WPA_SUPPLICANT_PRIVATE_LIB := lib_driver_cmd_nxp
++    BOARD_HOSTAPD_PRIVATE_LIB := lib_driver_cmd_nxp
++    BOARD_HOSTAPD_DRIVER := NL80211
++    BOARD_WLAN_DEVICE := nxp
++    CFI_INCLUDE_PATHS += hardware/nxp/88x9098/wlan/hal/wlan_lib
++endif
++
+ ifeq ($(BOARD_WIFI_VENDOR), realtek)
+     WPA_SUPPLICANT_VERSION := VER_0_8_X
+     BOARD_WPA_SUPPLICANT_DRIVER := NL80211
+@@ -33,3 +45,5 @@ endif
+ 
+ # Kernel build rules
+ TARGET_KERNEL_CONFIG := android_salvator_defconfig
++
++BOARD_SEPOLICY_DIRS += device/renesas/salvator/sepolicy
+diff --git a/device.mk b/device.mk
+index 0ddc251..38041ca 100644
+--- a/device.mk
++++ b/device.mk
+@@ -29,11 +29,23 @@ PRODUCT_COPY_FILES += \
+     device/renesas/salvator/init/init.salvator.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.salvator.rc \
+     device/renesas/salvator/init/init.salvator.usb.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.salvator.usb.rc \
+     device/renesas/salvator/init/ueventd.salvator.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc \
+-    device/renesas/salvator/init/init.recovery.salvator.rc:root/init.recovery.salvator.rc
++    device/renesas/salvator/init/init.recovery.salvator.rc:root/init.recovery.salvator.rc \
++    device/renesas/salvator/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
++    device/renesas/salvator/early.init.cfg:$(TARGET_COPY_OUT_VENDOR)/etc/early.init.cfg
+ 
+-# Bluetooth HAL (system/bt/vendor_libs/linux/interface)
++# Bluetooth HAL
+ PRODUCT_PACKAGES += \
+-    android.hardware.bluetooth@1.0-service.salvator
++    android.hardware.bluetooth@1.0-impl \
++    android.hardware.bluetooth@1.0-service \
++    libwifi-hal \
++    libbt-vendor \
++    bt_vendor.conf
++
++# NXP 9098 Wifi and Bluetooth Combo Firmware
++PRODUCT_COPY_FILES += \
++    device/renesas/salvator/wifi/p2p_supplicant.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant.conf \
++    device/renesas/salvator/wifi/wpa_supplicant.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant.conf \
++    vendor/nxp/FwImage_9098/pcieuart9098_combo_v1.bin:vendor/etc/firmware/pcieuart9098_combo_v1.bin
+ 
+ # Baroadcast radio
+ PRODUCT_PACKAGES += \
+@@ -41,7 +53,6 @@ PRODUCT_PACKAGES += \
+     si46xx_firmware \
+     si_flash
+ 
+-
+ # Touchcreen configuration
+ PRODUCT_COPY_FILES += \
+     device/renesas/salvator/touchscreen_skeleton.idc:$(TARGET_COPY_OUT_ODM)/usr/idc/touchscreen_skeleton.idc
+diff --git a/early.init.cfg b/early.init.cfg
+new file mode 100644
+index 0000000..23337a8
+--- /dev/null
++++ b/early.init.cfg
+@@ -0,0 +1,4 @@
++# support insmod xx.ko; setprop xx xx; modeprobe
++    insmod /vendor/lib/modules/mlan.ko
++    insmod /vendor/lib/modules/moal.ko fw_name=pcieuart9098_combo_v1.bin cal_data_cfg=none cfg80211_wext=0xf sta_name=wlan wfd_name=p2p max_vir_bss=1 drv_mode=7 wakelock_timeout=30
++    insmod /vendor/lib/modules/radio-i2c-si4689.ko
+diff --git a/init/init.insmod.sh b/init/init.insmod.sh
+new file mode 100644
+index 0000000..32c1162
+--- /dev/null
++++ b/init/init.insmod.sh
+@@ -0,0 +1,29 @@
++#! /vendor/bin/sh
++
++#########################################
++### cfg file format:                  ###
++### --------------------------------- ###
++### [insmod|setprop] [path|prop name] ###
++### ...                               ###
++#########################################
++
++cfg_file=$1
++
++if [ -f $cfg_file ]; then
++  while IFS=" " read -r action name value arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9
++  do
++    case $action in
++      "insmod") insmod $name $value $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9 ;;
++      "setprop") setprop $name $value ;;
++      "modprobe")
++                 if [ -f  /vendor/lib/modules/modules.load ]; then
++                     arg="$(cat /vendor/lib/modules/modules.load)"
++                     modprobe -a -d /vendor/lib/modules $arg
++                 fi
++    esac
++  done < $cfg_file
++fi
++
++# set property even if there is no insmod config
++# as property value "1" is expected in early-boot trigger
++setprop $2 1
+diff --git a/init/init.salvator.rc b/init/init.salvator.rc
+index 8faae38..d0e3b8e 100644
+--- a/init/init.salvator.rc
++++ b/init/init.salvator.rc
+@@ -16,15 +16,16 @@ import /vendor/etc/init/hw/init.common.rc
+ import /vendor/etc/init/hw/init.salvator.usb.rc
+ 
+ service wpa_supplicant /vendor/bin/hw/wpa_supplicant \
+-        -ip2p0 -Dnl80211 -c/vendor/etc/wifi/p2p_supplicant.conf \
+-        -N \
+-        -iwlan0 -Dnl80211 -c/vendor/etc/wifi/wpa_supplicant.conf \
+-        -O/data/vendor/wifi/wpa/sockets -g@android:wpa_wlan0
++     -O/data/vendor/wifi/wpa/sockets -puse_p2p_group_interface=1 \
++     -Dnl80211 -iwlan0 -c/vendor/etc/wifi/wpa_supplicant.conf -puse_multi_chan_concurrent=1 \
++     -N -Dnl80211 -ip2p0 -c/vendor/etc/wifi/p2p_supplicant.conf \
++     -g@android:wpa_wlan0
+      interface android.hardware.wifi.supplicant@1.0::ISupplicant default
+      interface android.hardware.wifi.supplicant@1.1::ISupplicant default
+      interface android.hardware.wifi.supplicant@1.2::ISupplicant default
+-     socket wpa_wlan0 dgram 660 wifi wifi
+      class main
++     socket wpa_wlan0 dgram 660 wifi wifi
++     shutdown critical
+      disabled
+      oneshot
+ 
+@@ -32,9 +33,6 @@ on init
+     # Support legacy paths
+     symlink /sdcard /mnt/sdcard
+     symlink /sdcard /storage/sdcard0
+-
+-on early-init
+-    insmod /vendor/lib/modules/radio-i2c-si4689.ko
+ 	
+ on fs
+     mount_all /vendor/etc/fstab.salvator --early
+@@ -45,8 +43,19 @@ on late-fs
+ on early-boot
+     setprop wifi.interface wlan0
+ 
++on early-init
++    start early_init_sh
++
+ on boot
+     # Wireless regulators control
++    chmod 0666 /sys/class/rfkill/rfkill0/state
+     chmod 0666 /sys/class/rfkill/rfkill1/state
+     chmod 0664 /dev/rfkill
+     chmod 0666 /sys/bus/platform/devices/bd9571mwv-regulator/backup_mode
++
++service early_init_sh /vendor/bin/init.insmod.sh /vendor/etc/early.init.cfg vendor.all.early_init.ready
++    class main
++    user root
++    group root system
++    disabled
++    oneshot
+diff --git a/init/init.salvator.usb.rc b/init/init.salvator.usb.rc
+index 2b9d553..d414092 100644
+--- a/init/init.salvator.usb.rc
++++ b/init/init.salvator.usb.rc
+@@ -30,4 +30,4 @@ on early-boot
+     insmod /vendor/lib/modules/pl2303.ko
+     insmod /vendor/lib/modules/ftdi_sio.ko
+     insmod /vendor/lib/modules/cdc-acm.ko
+-    exec u:r:vendor_modprobe:s0 root root -- /vendor/bin/toybox_vendor insmod /vendor/lib/modules/8812au.ko ifname=wlan0 if2name=p2p0
++#    exec u:r:vendor_modprobe:s0 root root -- /vendor/bin/toybox_vendor insmod /vendor/lib/modules/8812au.ko ifname=wlan0 if2name=p2p0
+diff --git a/manifest.xml b/manifest.xml
+index 53ced5a..b4de8d9 100644
+--- a/manifest.xml
++++ b/manifest.xml
+@@ -90,6 +90,15 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
++    <hal format="hidl">
++        <name>android.hardware.bluetooth</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IBluetoothHci</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
+     <hal format="hidl">
+         <name>android.hardware.usb</name>
+         <transport>hwbinder</transport>
+diff --git a/modules.mk b/modules.mk
+index 7dca762..c9a7be7 100644
+--- a/modules.mk
++++ b/modules.mk
+@@ -40,4 +40,9 @@ BOARD_VENDOR_KERNEL_MODULES += \
+ 	$(KERNEL_MODULES_OUT)/btrtl.ko \
+ 	$(KERNEL_MODULES_OUT)/btusb.ko
+ 
++BOARD_VENDOR_KERNEL_MODULES += \
++	$(KERNEL_MODULES_OUT)/hci_uart.ko \
++	$(KERNEL_MODULES_OUT)/mlan.ko \
++	$(KERNEL_MODULES_OUT)/moal.ko
++
+ include device/renesas/common/ModulesCommon.mk
+diff --git a/overlay/packages/apps/Bluetooth/res/values/config.xml b/overlay/packages/apps/Bluetooth/res/values/config.xml
+deleted file mode 100644
+index 6bec697..0000000
+--- a/overlay/packages/apps/Bluetooth/res/values/config.xml
++++ /dev/null
+@@ -1,24 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<!--
+-/*
+-** Copyright (C) 2018 GlobalLogic
+-**
+-** Licensed under the Apache License, Version 2.0 (the "License");
+-** you may not use this file except in compliance with the License.
+-** You may obtain a copy of the License at
+-**
+-**     http://www.apache.org/licenses/LICENSE-2.0
+-**
+-** Unless required by applicable law or agreed to in writing, software
+-** distributed under the License is distributed on an "AS IS" BASIS,
+-** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-** See the License for the specific language governing permissions and
+-** limitations under the License.
+-*/
+--->
+-
+-<!-- Disable hfp client profile. -->
+-<resources>
+-    <bool name="profile_supported_hfpclient">false</bool>
+-    <bool name="hfp_client_connection_service_enabled">false</bool>
+-</resources>
+diff --git a/sepolicy/init-insmod-sh.te b/sepolicy/init-insmod-sh.te
+new file mode 100644
+index 0000000..53904ce
+--- /dev/null
++++ b/sepolicy/init-insmod-sh.te
+@@ -0,0 +1,18 @@
++type init-insmod-sh, domain;
++type init-insmod-sh_exec, exec_type, vendor_file_type, file_type;
++
++init_daemon_domain(init-insmod-sh)
++
++set_prop(init-insmod-sh, vendor_public_default_prop)
++
++allow init-insmod-sh vendor_shell_exec:file rx_file_perms;
++allow init-insmod-sh vendor_toolbox_exec:file rx_file_perms;
++
++# Allow insmod
++allow init-insmod-sh self:capability sys_module;
++allow init-insmod-sh system_file:system module_load;
++
++allow init-insmod-sh vendor_file:system module_load;
++
++#allow init-insmod-sh vendor_wc_prop:property_service { set };
++allow init-insmod-sh proc_cmdline:file { read open getattr };
+diff --git a/sepolicy/property.te b/sepolicy/property.te
+new file mode 100644
+index 0000000..8ee474e
+--- /dev/null
++++ b/sepolicy/property.te
+@@ -0,0 +1 @@
++type vendor_public_default_prop, property_type;
+diff --git a/sepolicy/vendor/file_contexts b/sepolicy/vendor/file_contexts
+index a160b88..17fa0a2 100644
+--- a/sepolicy/vendor/file_contexts
++++ b/sepolicy/vendor/file_contexts
+@@ -5,7 +5,7 @@
+ /dev/ttyACM1                                                                    u:object_r:tty_device:s0
+ 
+ # BT TTY
+-/dev/ttySC1                                                                     u:object_r:tty_device:s0
++/dev/ttySC2                                                                     u:object_r:hci_attach_dev:s0
+ 
+ # Broadcast radio device
+ /dev/radio0                                                                     u:object_r:input_device:s0
+@@ -19,8 +19,13 @@
+ # Salvator HALs
+ /vendor/bin/hw/android.hardware.sensors@1.0-service.salvator                    u:object_r:hal_sensors_default_exec:s0
+ /vendor/bin/hw/android.hardware.bluetooth@1.0-service.salvator                  u:object_r:hal_bluetooth_btlinux_exec:s0
++/vendor/bin/hw/android.hardware.bluetooth@1.0-service                           u:object_r:hal_bluetooth_default_exec:s0
+ /vendor/bin/hw/android.hardware.broadcastradio@2.0-service.renesas              u:object_r:hal_broadcastradio_default_exec:s0
+ 
+ # Same process HALs installed by platform into /vendor
+ /vendor/lib(64)?/hw/audio.primary.salvator.so                                   u:object_r:same_process_hal_file:s0
+ /vendor/lib(64)?/hw/audio.r_submix.salvator.so                                  u:object_r:same_process_hal_file:s0
++
++#early_init_sh service
++/vendor/bin/init\.insmod\.sh                                                    u:object_r:init-insmod-sh_exec:s0
++/vendor/etc/early\.init\.cfg                                                    u:object_r:init-insmod-sh_exec:s0
+diff --git a/sepolicy/vendor/hal_bluetooth_default.te b/sepolicy/vendor/hal_bluetooth_default.te
+new file mode 100644
+index 0000000..ba1155f
+--- /dev/null
++++ b/sepolicy/vendor/hal_bluetooth_default.te
+@@ -0,0 +1,9 @@
++allow hal_bluetooth_default sysfs:file { write };
++allow hal_bluetooth_default bluetooth_data_file:file { write read append getattr };
++allow hal_bluetooth_default hal_bluetooth_default:unix_stream_socket { ioctl };
++allow hal_bluetooth_default hci_attach_dev:chr_file {open read write ioctl};
++allow hal_bluetooth_default sysfs:file { rw_file_perms create_file_perms };
++
++# talk to system_server to set priority
++allow hal_bluetooth_default fwk_scheduler_hwservice:hwservice_manager {find};
++allow hal_bluetooth_default system_server:binder {call};
+diff --git a/sepolicy/vendor/property_contexts b/sepolicy/vendor/property_contexts
+new file mode 100644
+index 0000000..3522ccf
+--- /dev/null
++++ b/sepolicy/vendor/property_contexts
+@@ -0,0 +1 @@
++vendor.all.early_init.ready        u:object_r:vendor_public_default_prop:s0
+diff --git a/wifi/p2p_supplicant.conf b/wifi/p2p_supplicant.conf
+new file mode 100644
+index 0000000..112ec68
+--- /dev/null
++++ b/wifi/p2p_supplicant.conf
+@@ -0,0 +1,7 @@
++ctrl_interface=p2p0
++update_config=1
++max_num_sta=1
++p2p_listen_reg_class=81
++p2p_listen_channel=11
++p2p_oper_reg_class=81
++p2p_oper_channel=11
+diff --git a/wifi/wpa_supplicant.conf b/wifi/wpa_supplicant.conf
+new file mode 100644
+index 0000000..df15299
+--- /dev/null
++++ b/wifi/wpa_supplicant.conf
+@@ -0,0 +1,7 @@
++update_config=1
++ctrl_interface=wlan0
++eapol_version=1
++ap_scan=1
++fast_reauth=1
++p2p_disabled=1
++wowlan_triggers=any
+-- 
+2.25.1
+
