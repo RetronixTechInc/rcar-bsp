@@ -1,6 +1,7 @@
 #!/bin/bash
 
 patch_des=${1}
+git_clean=${2}
 patch_path=$(cd `dirname $0` && pwd)
 patch_all=`ls ${patch_path}`
 patchs=""
@@ -30,6 +31,9 @@ function patch_loop
 			if [ ! -d "${patch_des}/${2}/.git" ]; then
 				echo "Create local git at ${patch_des}/${2}/.git"
 				git init && git add . && git commit -a -m "create git."
+			fi
+			if [ "${git_clean}x" == "cleanx" ]; then
+				rm -rf .git/rebase-apply
 			fi
 			git am "${patchs}"
 		else
