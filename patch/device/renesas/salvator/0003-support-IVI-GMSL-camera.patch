@@ -1,0 +1,26 @@
+From 2d9a575b72a015187f0cd7cbc4fd13493d3f9733 Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Mon, 4 Sep 2023 13:37:02 +0800
+Subject: [PATCH] support IVI GMSL camera.
+
+---
+ init/ueventd.salvator.rc | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/init/ueventd.salvator.rc b/init/ueventd.salvator.rc
+index dca6f63..7c08a5d 100644
+--- a/init/ueventd.salvator.rc
++++ b/init/ueventd.salvator.rc
+@@ -8,8 +8,7 @@
+ /dev/rgnmmbuf                                       0660    mediacodec      media
+ /dev/vspm_if                                        0660    mediacodec      media
+ /dev/uvcs                                           0660    mediacodec      media
+-/dev/video0                                         0666    media           media
+-/dev/video1                                         0666    media           media
++/dev/video*                                         0666    media           media
+ /dev/media0                                         0666    media           media
+ /dev/v4l-subdev0                                    0666    media           media
+ /dev/v4l-subdev1                                    0666    media           media
+-- 
+2.17.1
+
