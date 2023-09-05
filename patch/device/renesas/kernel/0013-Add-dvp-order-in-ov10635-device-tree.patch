@@ -1,0 +1,116 @@
+From bb139d7775c9b3ed5fb926a1710e2b771b12dadf Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Tue, 5 Sep 2023 11:14:23 +0800
+Subject: [PATCH] Add dvp-order in ov10635 device tree and addcsi_chsel in
+ device tree.
+
+---
+ .../dts/renesas/r8a7795-salvator-xs-android.dts  |  5 +++++
+ drivers/media/platform/rcar-vin/rcar-core.c      | 16 ++++++++++++++--
+ drivers/media/platform/rcar-vin/rcar-dma.c       |  4 ++--
+ drivers/media/platform/rcar-vin/rcar-vin.h       |  1 +
+ 4 files changed, 22 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+index 926069c09518..de5bb778542a 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+@@ -785,6 +785,7 @@
+ 
+ &vin0 {
+ 	status = "okay";
++	csi_chsel = <0>;
+ };
+ 
+ &vin1 {
+@@ -801,6 +802,7 @@
+ 
+ &vin4 {
+ 	status = "okay";
++	csi_chsel = <3>;
+ };
+ 
+ &vin5 {
+@@ -1431,6 +1433,7 @@
+ #endif
+ #ifdef CAMERA_OV10635
+ 				compatible = "ovti,ov10635";
++				dvp-order = <1>;
+ #endif
+ 				reg = <0x61 0x0d>;
+ 
+@@ -1453,6 +1456,7 @@
+ #endif
+ #ifdef CAMERA_OV10635
+ 				compatible = "ovti,ov10635";
++				dvp-order = <1>;
+ #endif
+ 				reg = <0x62 0x0e>;
+ 
+@@ -1475,6 +1479,7 @@
+ #endif
+ #ifdef CAMERA_OV10635
+ 				compatible = "ovti,ov10635";
++				dvp-order = <1>;
+ #endif
+ 				reg = <0x63 0x0f>;
+ 
+diff --git a/drivers/media/platform/rcar-vin/rcar-core.c b/drivers/media/platform/rcar-vin/rcar-core.c
+index a93cd1ba276a..389fa0062d98 100644
+--- a/drivers/media/platform/rcar-vin/rcar-core.c
++++ b/drivers/media/platform/rcar-vin/rcar-core.c
+@@ -1251,9 +1251,21 @@ static int rcar_vin_probe(struct platform_device *pdev)
+ 		goto error;
+ 	}
+ 	
+-	if(vin->id == 4)
++	if(vin->id == 0 || vin->id == 4)
+ 	{
+-		rvin_set_channel_routing(vin, 3);
++		u32 chsel = 0;
++
++		/* Make sure VIN id is present and sane */
++		ret = of_property_read_u32(vin->dev->of_node, "csi_chsel", &chsel);		
++		
++		if (ret) {
++			vin_err(vin, "Error: No csi_chsel property found\n");
++			return -EINVAL;
++		}
++		
++		vin->rtx_chsel = chsel;
++		printk(KERN_ERR "[RTX] vin->id = %d ; chsel = %d\n", vin->id, vin->rtx_chsel);
++		rvin_set_channel_routing(vin, vin->rtx_chsel);
+ 	}
+ 
+ 	return 0;
+diff --git a/drivers/media/platform/rcar-vin/rcar-dma.c b/drivers/media/platform/rcar-vin/rcar-dma.c
+index 95ac41979aad..1df202b28fbc 100644
+--- a/drivers/media/platform/rcar-vin/rcar-dma.c
++++ b/drivers/media/platform/rcar-vin/rcar-dma.c
+@@ -1433,9 +1433,9 @@ static int rvin_start_streaming(struct vb2_queue *vq, unsigned int count)
+ 	unsigned long flags;
+ 	int ret;
+ 
+-	if(vin->id == 4)
++	if(vin->id == 0 || vin->id == 4)	//[RTX] Temp Solution for chselect be reset in streaming off.
+ 	{
+-		rvin_set_channel_routing(vin, 3);
++		rvin_set_channel_routing(vin, vin->rtx_chsel);
+ 	}
+ 
+ 	/* Continuous capture requires more buffers then there are HW slots */
+diff --git a/drivers/media/platform/rcar-vin/rcar-vin.h b/drivers/media/platform/rcar-vin/rcar-vin.h
+index b87ef559b820..096c181bcdd2 100644
+--- a/drivers/media/platform/rcar-vin/rcar-vin.h
++++ b/drivers/media/platform/rcar-vin/rcar-vin.h
+@@ -254,6 +254,7 @@ struct rvin_dev {
+ 	wait_queue_head_t setup_wait;
+ 	bool suspend;
+ 	u32 chip_info;
++	unsigned int rtx_chsel;	//value from device tree (Only id=1 and id=4)
+ };
+ 
+ #define vin_to_source(vin)		((vin)->digital->subdev)
+-- 
+2.17.1
+
