@@ -1,0 +1,111 @@
+From 5b007c070c8bb3e62197fe63aca5f7f8e87e802b Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Wed, 27 Sep 2023 17:02:12 +0800
+Subject: [PATCH] Let Gnss Apk can fix position.
+
+---
+ 2.0/include/NmeaMsgHandler.h    |  2 +-
+ 2.0/include/NmeaRmc.h           | 29 ++++++++++++++++++++++-------
+ 2.0/source/GeneralManager.cpp   |  3 ++-
+ 2.0/source/LocationProvider.cpp | 11 +++++++++++
+ 4 files changed, 36 insertions(+), 9 deletions(-)
+
+diff --git a/2.0/include/NmeaMsgHandler.h b/2.0/include/NmeaMsgHandler.h
+index 822368a..f92bf0e 100644
+--- a/2.0/include/NmeaMsgHandler.h
++++ b/2.0/include/NmeaMsgHandler.h
+@@ -55,7 +55,7 @@ private:
+     std::atomic<bool> mExitThread;
+     std::thread mProcessingThread;
+     std::mutex mLock;
+-    NmeaVersion mProtocol = NMEAv23;
++    NmeaVersion mProtocol = NMEAv41;	//RTX Jerry
+     MessageQueue& mPipe;
+     std::condition_variable& mWaitCv;
+     const char crcDelimiter = '*';
+diff --git a/2.0/include/NmeaRmc.h b/2.0/include/NmeaRmc.h
+index a32d8fd..507ecb1 100644
+--- a/2.0/include/NmeaRmc.h
++++ b/2.0/include/NmeaRmc.h
+@@ -238,13 +238,28 @@ NPError NmeaRmc<T>::SetLocation(const std::string& lat,
+ template <typename T>
+ NPError NmeaRmc<T>::SetMotion(const std::string& speed,
+                               const std::string& cog) {
+-    if (speed.size() == 0 || cog.size() == 0) {
+-        return NPError::BadInputParameter;
+-    }
+-
+-    mParcel.speed = (static_cast<float>(atof(speed.c_str())) * knotToKmph) /
+-                    mpsToKmph;
+-    mParcel.cog = static_cast<float>(atof(cog.c_str()));
++    //if (speed.size() == 0 || cog.size() == 0) {
++    //    return NPError::BadInputParameter;
++    //}
++    //RTX Jerry
++    if(speed.size() == 0) {
++		mParcel.speed = 0;
++	}
++	else {
++		mParcel.speed = (static_cast<float>(atof(speed.c_str())) * knotToKmph) /
++                    mpsToKmph;	
++	}
++    
++     if(cog.size() == 0) {
++		mParcel.cog = 0;
++	}
++	else {
++		mParcel.cog = static_cast<float>(atof(cog.c_str()));
++	}   
++
++    //mParcel.speed = (static_cast<float>(atof(speed.c_str())) * knotToKmph) /
++    //                mpsToKmph;
++    //mParcel.cog = static_cast<float>(atof(cog.c_str()));
+     mFlags |= GnssLocationFlags::HAS_SPEED | GnssLocationFlags::HAS_BEARING;
+     return NPError::Success;
+ }
+diff --git a/2.0/source/GeneralManager.cpp b/2.0/source/GeneralManager.cpp
+index 3c44914..c6c7050 100644
+--- a/2.0/source/GeneralManager.cpp
++++ b/2.0/source/GeneralManager.cpp
+@@ -90,7 +90,8 @@ NmeaVersion GeneralManager::GetNmeaProtocol() {
+         return NmeaVersion::NMEAv41;
+ 
+     default:
+-        return NmeaVersion::NMEAv23;
++        return NmeaVersion::NMEAv41;	//RTX Jerry
++        //return NmeaVersion::NMEAv23;	
+     }
+ }
+ 
+diff --git a/2.0/source/LocationProvider.cpp b/2.0/source/LocationProvider.cpp
+index f62e9f8..75e4f34 100644
+--- a/2.0/source/LocationProvider.cpp
++++ b/2.0/source/LocationProvider.cpp
+@@ -28,13 +28,24 @@ LocationProvider::LocationProvider(uint32_t interval) :
+ 
+ void LocationProvider::Provide() {
+     ALOGV("%s", __func__);
++
++#define RTX_BYPASS_SYNC
++
++#ifndef RTX_BYPASS_SYNC    
+     auto& syncInstance = GnssMeasurementSync::GetInstance();
++#else
++    GnssMeasurementSync::GetInstance();
++#endif
+ 
+     while (!mThreadExit) {
+         LocationData data = {};
+         auto error = mBuilder->Build(data);
+ 
++#ifndef RTX_BYPASS_SYNC
+         if (mEnabled && syncInstance.Ready()) {
++#else       
++        if (mEnabled) {
++#endif
+             if (error == LBError::SUCCESS) {
+                 if (mGnssCallback_1_0) {
+                     ALOGV("%s, Provide location callback_1_0", __PRETTY_FUNCTION__);
+-- 
+2.17.1
+
