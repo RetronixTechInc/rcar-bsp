@@ -1,0 +1,78 @@
+From d1cb760d4342e25fa88c6f25a82a516e714a8eeb Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Thu, 5 Oct 2023 15:58:47 +0800
+Subject: [PATCH] make audio hal to support radio on salvator platform
+
+---
+ .../platform/salvator/platform_dependencies.h | 26 +++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/driver/platform/salvator/platform_dependencies.h b/driver/platform/salvator/platform_dependencies.h
+index 831f7e2..d434816 100644
+--- a/driver/platform/salvator/platform_dependencies.h
++++ b/driver/platform/salvator/platform_dependencies.h
+@@ -4,6 +4,8 @@
+ #include "../audio_hal_types.h"
+ 
+ /* Supported features */
++#define GEN3_FM_SUPPORT
++
+ #ifdef GEN3_HFP_SUPPORT
+ #undef GEN3_HFP_SUPPORT
+ #endif
+@@ -13,6 +15,8 @@
+ 
+ #define MIXER_PLAY_VOL              "DVC Out Playback Volume"
+ #define MIXER_CAPTURE_VOL           "DVC In Capture Volume"
++#define MIXER_DVC_IN_CAPTURE_VOL    "DVC In Capture Volume"
++#define MIXER_DVC_IN_CAP_VOL_DEF    2200000
+ 
+ #ifdef ENABLE_ADSP
+ #define MIXER_ADSP_PLAY_VOL         "PlaybackVolume" /* Volume gain in ADSP */
+@@ -38,8 +42,14 @@
+ #define PCM_CARD_DEFAULT          PCM_CARD_GEN3
+ #define PCM_DEVICE_DEFAULT        PCM_DEVICE_GEN3
+ 
++#define PCM_CARD_GEN3_FM          1
++#define PCM_DEVICE_GEN3_FM        0
++#define PCM_CARD_FM               PCM_CARD_GEN3_FM
++#define PCM_DEVICE_FM             PCM_DEVICE_GEN3_FM
++
+ #define IN_CHANNELS_DEFAULT 2
+ #define OUT_CHANNELS_DEFAULT 2
++#define IN_CHANNELS_FM 2
+ 
+ #define DEFAULT_OUT_SAMPLING_RATE   48000
+ #define DEFAULT_IN_SAMPLING_RATE    48000
+@@ -65,12 +75,28 @@ static struct route_setting defaults[] = {
+     },
+ };
+ 
++static struct route_setting defaultsfm[] = {
++    {
++        .ctl_name = MIXER_DVC_IN_CAPTURE_VOL,
++        .intval = MIXER_DVC_IN_CAP_VOL_DEF,
++    },
++    /* end of list */
++    { .ctl_name = NULL, },
++};
++
+ static struct device_card cards[] = {
+     {
+         .card = PCM_CARD_GEN3,
+         .defaults = defaults,
+         .mixer = 0,
+     },
++#if 0//mixer_get_ctl_by_name() cannot get the ctl_name defined in defaultsfm[] 
++    {
++        .card = PCM_CARD_GEN3_FM,
++        .defaults = defaultsfm,
++        .mixer = 0,
++    },
++#endif
+     {
+         .card = UINT32_MAX,
+     }
+-- 
+2.25.1
+
