@@ -1,0 +1,126 @@
+From d587fa9f10571d7589e50f86d412ad82df232b6e Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Thu, 26 Oct 2023 10:59:23 +0800
+Subject: [PATCH] to support NMEA4.11 and ignore the pattern with signalId=0 in
+ xxGSV
+
+---
+ 2.0/include/INmeaParser.h      |  5 +++--
+ 2.0/include/NmeaGsv.h          | 23 +++++++++++++++++++++++
+ 2.0/source/GnssInfoBuilder.cpp |  7 ++++---
+ 3 files changed, 30 insertions(+), 5 deletions(-)
+
+diff --git a/2.0/include/INmeaParser.h b/2.0/include/INmeaParser.h
+index 7de2101..533e7e9 100644
+--- a/2.0/include/INmeaParser.h
++++ b/2.0/include/INmeaParser.h
+@@ -64,8 +64,9 @@ enum NmeaConstellationId : size_t {
+     GLONASS       = 1,
+     GALILEO       = 2,
+     BEIDOU        = 3,
+-    ANY           = 4,
+-    COUNT         = 5,
++	QZSS411       = 4, //distinguish QZSS in NMEA4.11
++    ANY           = 5,
++    COUNT         = 6,
+ };
+ 
+ template <typename T>
+diff --git a/2.0/include/NmeaGsv.h b/2.0/include/NmeaGsv.h
+index 39bfe1e..c4bf213 100644
+--- a/2.0/include/NmeaGsv.h
++++ b/2.0/include/NmeaGsv.h
+@@ -41,6 +41,7 @@ protected:
+     NPError ParseSingleBlock(const std::vector<std::string>& in);
+     NPError ParseRepeatedBlocks(const std::vector<std::string>& in);
+     NPError ParseRepeatedBlock(std::vector<std::string>::const_iterator in);
++	NPError ParseSignalId(std::vector<std::string>::const_iterator in);
+     NPError ValidateParcel();
+ 
+ private:
+@@ -54,6 +55,8 @@ private:
+         elevation = 1,
+         azimuth = 2,
+         cn0 = 3,
++		
++        signalid = 0,
+     };
+ 
+     typedef struct {
+@@ -199,6 +202,9 @@ NPError NmeaGsv<T>::ParseSingleBlock(const std::vector<std::string>& in) {
+     if (in[GsvOfst::gnssId].compare(position, cmpSize, "$GP") == 0) {
+         mParcel.gnssId = NmeaConstellationId::GPS_SBAS_QZSS;
+         mParcel.carrierFrequencyHz = (L1BandFrequency * scale);
++    } else if (in[GsvOfst::gnssId].compare(position, cmpSize, "$GQ") == 0) {//distinguish QZSS in NMEA4.11
++        mParcel.gnssId = NmeaConstellationId::QZSS411;
++        mParcel.carrierFrequencyHz = (L1BandFrequency * scale);
+     } else if (in[GsvOfst::gnssId].compare( position, cmpSize, "$GL") == 0) {
+         mParcel.gnssId = NmeaConstellationId::GLONASS;
+         mParcel.carrierFrequencyHz = (L1GlonassBandFrequency * scale);
+@@ -239,6 +245,8 @@ NPError NmeaGsv<T>::ParseRepeatedBlocks(const std::vector<std::string>& in) {
+         std::advance(itBegin, mRepeatedBlockFieldNum);
+         dist = std::distance(itBegin, in.end());
+     }
++	
++	result = ParseSignalId(itBegin);
+ 
+     return result;
+ }
+@@ -269,6 +277,8 @@ void NmeaGsv<T>::ProcessSvid(repeated_t& block) {
+         block.svid += 31;
+     } else if ((block.svid >= 193) && (block.svid <= 197)) {
+         block.constellation = GnssConstellationType::QZSS;
++    } else if (mParcel.gnssId == NmeaConstellationId::QZSS411) {
++        block.constellation = GnssConstellationType::QZSS;
+     } else {
+         if (mParcel.gnssId != NmeaConstellationId::ANY) {
+             ALOGW("Unknown constellation type with Svid = %d", block.svid);
+@@ -288,6 +298,19 @@ NPError NmeaGsv<T>::ParseRepeatedBlock(std::vector<std::string>::const_iterator
+     mParcel.subPart.push_back(block);
+     return NPError::Success;
+ }
++
++/* artie: to skip the pattern with signalId=0 for NMEA4.11 */ 
++template <typename T>
++NPError NmeaGsv<T>::ParseSignalId(std::vector<std::string>::const_iterator in) {
++	uint32_t signalid;
++
++	signalid = std::atoi((in + GsvOfst::signalid)->c_str());
++	if(signalid == 0)
++		return NPError::UnknownError;
++	else
++		return NPError::Success;
++}
++
+ //TODO(g.chabukiani): implement validation
+ template <typename T>
+ NPError NmeaGsv<T>::ValidateParcel() {
+diff --git a/2.0/source/GnssInfoBuilder.cpp b/2.0/source/GnssInfoBuilder.cpp
+index dad0fca..dd45621 100644
+--- a/2.0/source/GnssInfoBuilder.cpp
++++ b/2.0/source/GnssInfoBuilder.cpp
+@@ -163,7 +163,8 @@ void GnssInfoBuilder::ProcessFixFlag(GnssSvInfo& sv, uint8_t gnssId) {
+     uint32_t origSvid = sv.v1_0.svid;
+     if (NmeaConstellationId::GLONASS == gnssId){
+         origSvid += 64;
+-    } else if (origSvid >= 140 && origSvid <= 171) {
++//    } else if (origSvid >= 140 && origSvid <= 171) {//artie??? according to NmeaGsv.h, it should be 120~151
++    } else if (origSvid >= 120 && origSvid <= 151) {//artietest
+         origSvid -= 87;
+     } else if (origSvid >= 183 && origSvid <= 189) {
+         origSvid -= 31;
+@@ -198,9 +199,9 @@ IBError GnssInfoBuilder::Build(SvInfoList& outList) {
+         }
+     }
+ 
+-    ALOGV("GPS SV: GPS/SBAS/QZSS:%lu GLONASS:%lu GALILEO:%lu BEIDOU:%lu UNKNOWN:%lu total:%u",
++    ALOGV("GPS SV: GPS/SBAS/QZSS:%lu GLONASS:%lu GALILEO:%lu BEIDOU:%lu QZSS411:%lu UNKNOWN:%lu total:%u",
+         mSatellites[0].size(), mSatellites[1].size(), mSatellites[2].size(), mSatellites[3].size(),
+-        mSatellites[4].size(), svCount);
++        mSatellites[4].size(), mSatellites[5].size(), svCount);
+ 
+     return IBError::SUCCESS;
+ }
+-- 
+2.25.1
+
