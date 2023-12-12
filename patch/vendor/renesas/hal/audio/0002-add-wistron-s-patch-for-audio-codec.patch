@@ -1,0 +1,36 @@
+From d148c27917b7ec9a7e817b527b883be2e8f19add Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Tue, 12 Dec 2023 15:27:05 +0800
+Subject: [PATCH] add wistron's patch for audio codec
+
+---
+ overlay/frameworks/base/core/res/res/values/config.xml      | 2 +-
+ overlay/packages/services/Car/service/res/values/config.xml | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/overlay/frameworks/base/core/res/res/values/config.xml b/overlay/frameworks/base/core/res/res/values/config.xml
+index b256c8b..43ffbd4 100644
+--- a/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -1,6 +1,6 @@
+ <resources>
+     <!-- Car uses hardware amplifier for volume. -->
+-    <bool name="config_useFixedVolume">true</bool>
++    <bool name="config_useFixedVolume">false</bool>
+     <!--
+       Handle volume keys directly in CarAudioService without passing them to the foreground app
+     -->
+diff --git a/overlay/packages/services/Car/service/res/values/config.xml b/overlay/packages/services/Car/service/res/values/config.xml
+index 28857b3..144f65c 100644
+--- a/overlay/packages/services/Car/service/res/values/config.xml
++++ b/overlay/packages/services/Car/service/res/values/config.xml
+@@ -22,5 +22,5 @@
+   See also packages/services/Car/service/res/values/config.xml
+ -->
+ <resources>
+-    <bool name="audioUseDynamicRouting">true</bool>
++    <bool name="audioUseDynamicRouting">false</bool>
+ </resources>
+-- 
+2.25.1
+

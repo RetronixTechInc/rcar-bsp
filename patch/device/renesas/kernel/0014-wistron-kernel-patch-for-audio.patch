@@ -1,0 +1,178 @@
+From 472554f18d512f6b2d3b9e50f42bb776ec3f5245 Mon Sep 17 00:00:00 2001
+From: artiewang <artiewang@retronix.com.tw>
+Date: Tue, 12 Dec 2023 15:12:52 +0800
+Subject: [PATCH] add wistron's patch for audio codec
+
+---
+ .../renesas/r8a7795-salvator-xs-android.dts   | 31 +++++++++++++---
+ arch/arm64/configs/android_salvator_defconfig |  4 ++-
+ .../wireless/nxp/88x9098/wlan_src/Makefile    |  2 +-
+ sound/soc/codecs/pcm3168a-i2c.c               | 36 +++++++++++++++++++
+ sound/soc/codecs/pcm3168a.c                   |  5 +++
+ 5 files changed, 71 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+index de5bb778542a..b4883827d798 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+@@ -289,9 +289,16 @@
+ 		enable-active-high;
+ 	};
+ 
++	snd_clk: snd_clk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++		clock-output-names = "scki";
++	};
++
+ 	sound_card: sound@0 {
+ 		compatible = "audio-graph-card";
+-		label = "ak4613";
++		label = "pcm3168a";
+         dais = <&rsnd_port0>;
+ 	};
+ 	
+@@ -938,9 +945,9 @@
+ 		rsnd_port0: port@0 {
+ 			reg = <0>;
+ 			rsnd_endpoint0: endpoint {
+-				remote-endpoint = <&ak4613_endpoint4>;
++				remote-endpoint = <&pcm3168a_endpoint0>;
+ 
+-				dai-format = "left_j";
++				dai-format = "right_j";
+ 				bitclock-master = <&rsnd_endpoint0>;
+ 				frame-master = <&rsnd_endpoint0>;
+ 
+@@ -1120,9 +1127,23 @@
+ 		reg = <0x77>;
+ 	};
+ 
+-	U6600: PCM3168@44 { /* Audio ID not sure. */
+-		compatible = "idt,PCA9654";
++	pcm3168a: audio-codec@44 {
++		compatible = "ti,pcm3168a";
+ 		reg = <0x44>;
++		#sound-dai-cells = <0>;
++		clocks = <&snd_clk>;
++		clock-names = "scki";
++		mute-gpio = <&gpio5 3 GPIO_ACTIVE_LOW>;
++
++		port@0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++			pcm3168a_endpoint0: endpoint@0 {
++			reg = <0>;
++			remote-endpoint = <&rsnd_endpoint0>;
++			};
++		};
+ 	};
+ 
+ 	U6601: TPA6404@2a { /* Audio ID not sure. */
+diff --git a/arch/arm64/configs/android_salvator_defconfig b/arch/arm64/configs/android_salvator_defconfig
+index cb4632990718..74d685177f1c 100644
+--- a/arch/arm64/configs/android_salvator_defconfig
++++ b/arch/arm64/configs/android_salvator_defconfig
+@@ -420,7 +420,7 @@ CONFIG_SND=y
+ # CONFIG_SND_USB is not set
+ CONFIG_SND_SOC=y
+ CONFIG_SND_SOC_RCAR=y
+-CONFIG_SND_SOC_AK4613=y
++# CONFIG_SND_SOC_AK4613 is not set
+ CONFIG_SND_SOC_SI468X=y
+ CONFIG_SND_SOC_HDMI_CODEC=y
+ CONFIG_HIDRAW=y
+@@ -567,3 +567,5 @@ CONFIG_IIO_TRIGGER=y
+ CONFIG_REGULATOR_MAX2008X=y
+ CONFIG_SOC_CAMERA_AR0233=y
+ CONFIG_SOC_CAMERA_OV10635=y
++CONFIG_SND_SOC_PCM3168A=y
++CONFIG_SND_SOC_PCM3168A_I2C=y
+diff --git a/drivers/net/wireless/nxp/88x9098/wlan_src/Makefile b/drivers/net/wireless/nxp/88x9098/wlan_src/Makefile
+index df5ca4204c71..87792b555be2 100644
+--- a/drivers/net/wireless/nxp/88x9098/wlan_src/Makefile
++++ b/drivers/net/wireless/nxp/88x9098/wlan_src/Makefile
+@@ -240,7 +240,7 @@ ifeq ($(GCC_VERSION),1)
+ endif
+ WimpGCC_VERSION := $(shell echo `gcc -dumpversion | cut -f1 -d.`| bc )
+ ifeq ($(shell test $(WimpGCC_VERSION) -ge 7; echo $$?),0)
+-ccflags-y += -Wimplicit-fallthrough=3
++#ccflags-y += -Wimplicit-fallthrough=3
+ endif
+ #ccflags-y += -Wunused-but-set-variable
+ #ccflags-y += -Wmissing-prototypes
+diff --git a/sound/soc/codecs/pcm3168a-i2c.c b/sound/soc/codecs/pcm3168a-i2c.c
+index 6feb0901dfeb..a3a5f8ff67fd 100644
+--- a/sound/soc/codecs/pcm3168a-i2c.c
++++ b/sound/soc/codecs/pcm3168a-i2c.c
+@@ -18,6 +18,26 @@
+ 
+ #include "pcm3168a.h"
+ 
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
++
++static int tpa6404_reg_write(struct i2c_adapter *adapter, uint8_t reg, uint8_t val)
++{
++	int ret;
++	uint8_t buf[2];
++	struct i2c_msg msg;
++
++	buf[0] = reg;
++	buf[1] = val;
++	msg.addr = 0x2a; // TPA6404 I2C slave address
++	msg.len = 2;
++	msg.buf = buf;
++	msg.flags = 0;
++
++	ret = i2c_transfer(adapter, &msg, 1);
++	return ret < 0 ? ret : 0;
++}
++
+ static int pcm3168a_i2c_probe(struct i2c_client *i2c,
+ 			     const struct i2c_device_id *id)
+ {
+@@ -27,6 +47,22 @@ static int pcm3168a_i2c_probe(struct i2c_client *i2c,
+ 	if (IS_ERR(regmap))
+ 		return PTR_ERR(regmap);
+ 
++	tpa6404_reg_write(i2c->adapter, 0x00, 0x80); // Mode Control: Resets the device (0x80)
++	tpa6404_reg_write(i2c->adapter, 0x04, 0x00); // Channel state control: 0x55 (Hi-Z) -> 0x00 (PLAY)
++	tpa6404_reg_write(i2c->adapter, 0x2b, 0x01); // SYNC PIN CONTROL: 0x00 -> 0x01 (Master Mode)
++
++	if (i2c->dev.of_node) {
++		int mute_gpio;
++
++		mute_gpio = of_get_named_gpio(i2c->dev.of_node, "mute-gpio", 0);
++		if (gpio_is_valid(mute_gpio)) { // pull-up MUTE/STANDBY
++			if (!devm_gpio_request(&i2c->dev, mute_gpio, "TPA6404 MUTE/STANDBY")) {
++				gpio_direction_output(mute_gpio, 0);
++				gpio_set_value(mute_gpio, 1);
++			}
++		}
++	}
++
+ 	return pcm3168a_probe(&i2c->dev, regmap);
+ }
+ 
+diff --git a/sound/soc/codecs/pcm3168a.c b/sound/soc/codecs/pcm3168a.c
+index 9f5c088c3dc6..9e74a2037ae6 100644
+--- a/sound/soc/codecs/pcm3168a.c
++++ b/sound/soc/codecs/pcm3168a.c
+@@ -564,6 +564,11 @@ static int pcm3168a_hw_params(struct snd_pcm_substream *substream,
+ 		PCM3168A_DAC_SRDA_MASK,
+ 		sample_rate << PCM3168A_DAC_SRDA_SHIFT);
+ 
++	if (pcm3168a->tdm == TDM_MODE_NONE && bits == 16) {
++		regmap_update_bits(pcm3168a->regmap, PCM3168A_DAC_PWR_MST_FMT,
++			PCM3168A_DAC_FMT_MASK,
++			PCM3168A_FMT_RIGHT_J_16 << PCM3168A_DAC_FMT_SHIFT);
++	}
+ 	return 0;
+ }
+ 
+-- 
+2.25.1
+
