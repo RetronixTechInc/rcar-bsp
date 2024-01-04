@@ -1,0 +1,64 @@
+From 0546e0b019aff3b710fc6a81e249a40907b9822b Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Thu, 4 Jan 2024 10:49:16 +0800
+Subject: [PATCH] Add ttySC3 to support ISDB-T module.
+
+---
+ .../dts/renesas/r8a7795-salvator-xs-android.dts     | 13 +++++++++++++
+ arch/arm64/configs/android_salvator_defconfig       |  2 +-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+index b4883827d798..09a3ab5ad37e 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+@@ -28,6 +28,7 @@
+ 		serial0 = &scif2;
+ 		serial1 = &scif1;
+ 		serial2 = &hscif0;
++		serial3 = &scif0;
+ 		ethernet0 = &avb;
+ 	};
+ 
+@@ -617,6 +618,11 @@
+ 		function = "hscif0";
+ 	};
+ 
++	scif0_pins: scif0 {
++		groups = "scif0_data";
++		function = "scif0";
++	};
++
+ 	scif1_pins: scif1 {
+ 		groups = "scif1_data_a", "scif1_ctrl";
+ 		function = "scif1";
+@@ -1580,6 +1586,13 @@
+ 	clock-frequency = <14745600>;
+ };
+ 
++&scif0 {
++	pinctrl-0 = <&scif0_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
+ &scif1 {
+ 	pinctrl-0 = <&scif1_pins>;
+ 	pinctrl-names = "default";
+diff --git a/arch/arm64/configs/android_salvator_defconfig b/arch/arm64/configs/android_salvator_defconfig
+index 74d685177f1c..589cbf721bdf 100644
+--- a/arch/arm64/configs/android_salvator_defconfig
++++ b/arch/arm64/configs/android_salvator_defconfig
+@@ -337,7 +337,7 @@ CONFIG_INPUT_GPIO=y
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVMEM is not set
+ CONFIG_SERIAL_SH_SCI=y
+-CONFIG_SERIAL_SH_SCI_NR_UARTS=3
++CONFIG_SERIAL_SH_SCI_NR_UARTS=4
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_DEVPORT is not set
+ CONFIG_I2C_CHARDEV=y
+-- 
+2.25.1
+

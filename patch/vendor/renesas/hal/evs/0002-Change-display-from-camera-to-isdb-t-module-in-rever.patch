@@ -1,0 +1,190 @@
+From 642e41f0e7396930c53ecef3a0109f3bfa8fd4ae Mon Sep 17 00:00:00 2001
+From: TomWang <townwang@retronix.com.tw>
+Date: Wed, 3 Jan 2024 17:00:11 +0800
+Subject: [PATCH] Change display from camera to isdb-t module in reverse mode.
+
+---
+ EvsEnumerator.cpp    | 53 +++++++++++++++++++-------------------------
+ config.salvator.json | 14 +++++++++++-
+ 2 files changed, 36 insertions(+), 31 deletions(-)
+
+diff --git a/EvsEnumerator.cpp b/EvsEnumerator.cpp
+index a117aa3..55fe63f 100644
+--- a/EvsEnumerator.cpp
++++ b/EvsEnumerator.cpp
+@@ -51,7 +51,7 @@ EvsEnumerator::EvsEnumerator() {
+     */
+ 
+     /* subdev for HDMI camera input */
+-    //const char *subdev_name = "/dev/v4l-subdev1";
++    const char *subdev_name = "/dev/v4l-subdev3";
+     const char *subdev_name_csi = "/dev/v4l-subdev0";
+     // Constant predefined list of EVS cameras in the "/dev" filesystem.
+     const std::vector<const char *> cameraNames {
+@@ -61,7 +61,6 @@ EvsEnumerator::EvsEnumerator() {
+         "/dev/video4"
+     };
+ 
+-#if 0
+     if(access(subdev_name, F_OK ) != -1){
+         if(subdevCameraSetup(subdev_name)) {
+             ALOGD("Successfully setup camera %s", subdev_name);
+@@ -69,8 +68,8 @@ EvsEnumerator::EvsEnumerator() {
+             ALOGE("Error during setup %s", subdev_name);
+         }
+     } 
+-    else 
+-#endif
++
++
+     {
+ 		subdevCsiSetup(subdev_name_csi);
+ 		
+@@ -85,14 +84,12 @@ EvsEnumerator::EvsEnumerator() {
+             v4l2_format format;
+             std::memset(&format, 0x00, sizeof(format));
+             format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+-            if (ioctl(fd, VIDIOC_G_FMT, &format) < 0) 
+-            {
++            if (ioctl(fd, VIDIOC_G_FMT, &format) < 0) {
+                 ALOGE("VIDIOC_G_FMT: %s for device %s.", strerror(errno), cn);
+-            } 
+-            else 
+-            {
++            } else {
+                 sCameraList.emplace_back(cn, format.fmt.pix.width, format.fmt.pix.height);
+-                ALOGI("Camera %s (%ux%u) is successfully probed.", cn, format.fmt.pix.width, format.fmt.pix.height);
++                ALOGI("Camera %s (%ux%u) is successfully probed.",
++                        cn, format.fmt.pix.width, format.fmt.pix.height);
+             }
+ 
+             close(fd);
+@@ -172,8 +169,7 @@ bool EvsEnumerator::subdevCameraSetup(const char* subdev_name) {
+     sub_format.format.height = 0;
+     sub_format.pad = 1;
+ 
+-	int fd = -1;
+-#if 0
++    int fd = -1;
+     if( (fd = open(subdev_name, O_RDWR)) == -1) {
+         ALOGE("Error while opening device %s: %s", subdev_name, strerror(errno));
+         return false;
+@@ -184,20 +180,18 @@ bool EvsEnumerator::subdevCameraSetup(const char* subdev_name) {
+         return false;
+     }
+     close(fd);
+-#endif
+-	sub_format.format.width = 1280;
+-	sub_format.format.height = 800;
+-	
+-    ALOGD("Parameters received from camera is w=%u h=%u\n",sub_format.format.width, sub_format.format.height);
++
++    ALOGD("Parameters received from camera is w=%u h=%u\n",
++                sub_format.format.width, sub_format.format.height);
+     if(sub_format.format.height && sub_format.format.width){
+         /* Set format on source pad of CSI2 */
+         sub_format.pad = 0;
+-        if ((fd = open("/dev/v4l-subdev0", O_RDWR)) == -1) {
+-            ALOGE("Error while opening device %s: %s", "/dev/v4l-subdev0", strerror(errno));
++        if ((fd = open("/dev/v4l-subdev2", O_RDWR)) == -1) {
++            ALOGE("Error while opening device %s: %s", "/dev/v4l-subdev2", strerror(errno));
+             return false;
+         }
+         if (ioctl(fd, VIDIOC_SUBDEV_S_FMT, &sub_format) < 0) {
+-            ALOGE("/dev/v4l-subdev0 VIDIOC_SUBDEV_S_FMT: %s", strerror(errno));
++            ALOGE("/dev/v4l-subdev2 VIDIOC_SUBDEV_S_FMT: %s", strerror(errno));
+             close(fd);
+             return false;
+         }
+@@ -205,32 +199,31 @@ bool EvsEnumerator::subdevCameraSetup(const char* subdev_name) {
+ 
+         /* Set format on source (output, ADV748X_HDMI_SOURCE) pad of ADV7482 HDMI */
+         sub_format.pad = 1;
+-        if ((fd = open("/dev/v4l-subdev1", O_RDWR)) == -1) {
+-            ALOGE("Error while opening device %s: %s", "/dev/v4l-subdev1", strerror(errno));
++        if ((fd = open("/dev/v4l-subdev3", O_RDWR)) == -1) {
++            ALOGE("Error while opening device %s: %s", "/dev/v4l-subdev3", strerror(errno));
+             return false;
+         }
+         if (ioctl(fd, VIDIOC_SUBDEV_S_FMT, &sub_format) < 0) {
+-            ALOGE("/dev/v4l-subdev1 VIDIOC_SUBDEV_S_FMT: %s", strerror(errno));
++            ALOGE("/dev/v4l-subdev3 VIDIOC_SUBDEV_S_FMT: %s", strerror(errno));
+             close(fd);
+             return false;
+         }
+         close(fd);
+ 
+-#if 0
+         /* Set format on sink (input, ADV748X_CSI2_SINK) pad of ADV7482 TXA */
+         sub_format.pad = 0;
+-        if ((fd = open("/dev/v4l-subdev2", O_RDWR)) == -1) {
+-            ALOGE("Error while opening device %s: %s", "/dev/v4l-subdev2", strerror(errno));
++        if ((fd = open("/dev/v4l-subdev4", O_RDWR)) == -1) {
++            ALOGE("Error while opening device %s: %s", "/dev/v4l-subdev4", strerror(errno));
+             return false;
+         }
+         if (ioctl(fd, VIDIOC_SUBDEV_S_FMT, &sub_format) < 0) {
+-            ALOGE("/dev/v4l-subdev2 VIDIOC_SUBDEV_S_FMT: %s", strerror(errno));
++            ALOGE("/dev/v4l-subdev4 VIDIOC_SUBDEV_S_FMT: %s", strerror(errno));
+             close(fd);
+             return false;
+         }
+         close(fd);
+-#endif
+-        sCameraList.emplace_back("/dev/video4", sub_format.format.width, sub_format.format.height);
++
++        sCameraList.emplace_back("/dev/video0", sub_format.format.width, sub_format.format.height);
+     } else {
+         ALOGD("No camera found with %s", subdev_name);
+         return false;
+@@ -254,7 +247,6 @@ Return<void> EvsEnumerator::getCameraList(getCameraList_cb _hidl_cb)  {
+ 
+     // Send back the results
+     ALOGD("reporting %zu cameras available", hidlCameras.size());
+-    
+     _hidl_cb(hidlCameras);
+ 
+     // HIDL convention says we return Void if we sent our result back via callback
+@@ -292,6 +284,7 @@ Return<sp<IEvsCamera>> EvsEnumerator::openCamera(const hidl_string& cameraId) {
+ 
+ Return<void> EvsEnumerator::closeCamera(const ::android::sp<IEvsCamera>& pCamera) {
+     ALOGD("closeCamera");
++
+     if (pCamera == nullptr) {
+         ALOGE("Ignoring call to closeCamera with null camera ptr");
+         return Void();
+diff --git a/config.salvator.json b/config.salvator.json
+index a62f643..d7bf1ad 100644
+--- a/config.salvator.json
++++ b/config.salvator.json
+@@ -16,7 +16,7 @@
+   "cameras" : [
+   {
+       "cameraId" : "/dev/video4",
+-      "function" : "reverse,park",
++      "function" : "park",
+       "x" : 0.0,
+       "y" : 0.0,
+       "z" : 150,
+@@ -61,6 +61,18 @@
+       "hfov" : 90,
+       "vfov" : 30,
+       "distort": "pincushion"
++    },
++    {
++      "cameraId" : "/dev/video0",
++      "function" : "reverse",
++      "x" : 0.0,
++      "y" : 0.0,
++      "z" : 150,
++      "yaw" : 180,
++      "pitch" : -50,
++      "hfov" : 90,
++      "vfov" : 30,
++      "distort": "simpleTexture"
+     }
+   ]
+ }
+-- 
+2.25.1
+

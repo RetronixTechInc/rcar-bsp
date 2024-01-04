@@ -1,0 +1,74 @@
+From 166b404bf8f14ef04a944daca32ea037c004be12 Mon Sep 17 00:00:00 2001
+From: Jerry Lin <jerrylin@retronix.com.tw>
+Date: Tue, 2 Jan 2024 11:40:17 +0800
+Subject: [PATCH] Support subdev4~7 and build msd_cmd with ISDB-T module.
+
+---
+ BoardConfig.mk                | 1 +
+ device.mk                     | 4 ++++
+ init/ueventd.salvator.rc      | 5 +++++
+ sepolicy/vendor/file_contexts | 5 +++++
+ 4 files changed, 15 insertions(+)
+
+diff --git a/BoardConfig.mk b/BoardConfig.mk
+index ac94e41..d79c812 100644
+--- a/BoardConfig.mk
++++ b/BoardConfig.mk
+@@ -42,6 +42,7 @@ ifeq ($(BOARD_WIFI_VENDOR), realtek)
+     CFI_INCLUDE_PATHS += device/linaro/poplar/wifi/wpa_supplicant_8_lib
+ endif
+ 
++BUILD_BROKEN_DUP_RULES := true
+ 
+ # Kernel build rules
+ TARGET_KERNEL_CONFIG := android_salvator_defconfig
+diff --git a/device.mk b/device.mk
+index 38041ca..9dc60a0 100644
+--- a/device.mk
++++ b/device.mk
+@@ -62,6 +62,10 @@ PRODUCT_PACKAGES += \
+     libwifilogd \
+     p2p_supplicant.conf
+ 
++PRODUCT_PACKAGES += \
++    msd_cmd
++
++
+ PRODUCT_PROPERTY_OVERRIDES += \
+     wifi.direct.interface=p2p0 \
+     wifi.interface=wlan0
+diff --git a/init/ueventd.salvator.rc b/init/ueventd.salvator.rc
+index 7c08a5d..fc22f30 100644
+--- a/init/ueventd.salvator.rc
++++ b/init/ueventd.salvator.rc
+@@ -13,6 +13,11 @@
+ /dev/v4l-subdev0                                    0666    media           media
+ /dev/v4l-subdev1                                    0666    media           media
+ /dev/v4l-subdev2                                    0666    media           media
++/dev/v4l-subdev3                                    0666    media           media
++/dev/v4l-subdev4                                    0666    media           media
++/dev/v4l-subdev5                                    0666    media           media
++/dev/v4l-subdev6                                    0666    media           media
++/dev/v4l-subdev7                                    0666    media           media
+ /dev/radio0                                         0660    system          audio
+ /dev/graphics/fb0                                   0666    system          graphics
+ /dev/tee0                                           0660    system          keystore
+diff --git a/sepolicy/vendor/file_contexts b/sepolicy/vendor/file_contexts
+index 17fa0a2..b5a40d2 100644
+--- a/sepolicy/vendor/file_contexts
++++ b/sepolicy/vendor/file_contexts
+@@ -15,6 +15,11 @@
+ /dev/v4l-subdev0                                                                u:object_r:video_device:s0
+ /dev/v4l-subdev1                                                                u:object_r:video_device:s0
+ /dev/v4l-subdev2                                                                u:object_r:video_device:s0
++/dev/v4l-subdev3                                                                u:object_r:video_device:s0
++/dev/v4l-subdev4                                                                u:object_r:video_device:s0
++/dev/v4l-subdev5                                                                u:object_r:video_device:s0
++/dev/v4l-subdev6                                                                u:object_r:video_device:s0
++/dev/v4l-subdev7                                                                u:object_r:video_device:s0
+ 
+ # Salvator HALs
+ /vendor/bin/hw/android.hardware.sensors@1.0-service.salvator                    u:object_r:hal_sensors_default_exec:s0
+-- 
+2.25.1
+
