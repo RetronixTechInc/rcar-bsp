@@ -1,0 +1,806 @@
+From cb58f010c37a3a1d7be4f3ef130124e5b0f21fae Mon Sep 17 00:00:00 2001
+From: JerryLin <jerrylin@retronix.com.tw>
+Date: Thu, 1 Feb 2024 10:47:39 +0800
+Subject: [PATCH] Add I2S driver in adv7482.
+
+---
+ .../renesas/r8a7795-salvator-xs-android.dts   |  36 ++-
+ .../boot/dts/renesas/salvator-common.dtsi     |  15 +-
+ drivers/media/i2c/adv748x/Makefile            |   3 +-
+ drivers/media/i2c/adv748x/adv748x-afe.c       |   5 +-
+ drivers/media/i2c/adv748x/adv748x-core.c      |  36 ++-
+ drivers/media/i2c/adv748x/adv748x-csi2.c      |   5 +-
+ drivers/media/i2c/adv748x/adv748x-dai.c       | 285 ++++++++++++++++++
+ drivers/media/i2c/adv748x/adv748x-hdmi.c      |   4 +-
+ drivers/media/i2c/adv748x/adv748x.h           |  71 ++++-
+ 9 files changed, 434 insertions(+), 26 deletions(-)
+ create mode 100644 drivers/media/i2c/adv748x/adv748x-dai.c
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+index 09a3ab5ad37e..11721e7ba136 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs-android.dts
+@@ -309,6 +309,12 @@
+         dais = <&rsnd_port3>;
+ 	};
+ 
++	sound_adv7482: sound@4 {
++        compatible = "audio-graph-card";
++        label = "adv7482";
++        dais = <&rsnd_port4>;
++	};
++
+ 	radio: si468x@0 {
+         compatible = "si,si468x-pcm";
+         port {
+@@ -665,9 +671,9 @@
+ 	sound_pins: sound {
+ #ifdef SSI6_USE_USB2_PINS
+ 		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a", 
+-				"ssi6_ctrl", "ssi6_data";
++				"ssi6_ctrl", "ssi6_data", "ssi4_data", "ssi4_ctrl";
+ #else
+-		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a";
++		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a", "ssi4_data", "ssi4_ctrl";
+ #endif
+ 		function = "ssi";
+ 	};
+@@ -997,6 +1003,21 @@
+                 capture = <&ssi6>;
+             };
+         };
++        rsnd_port4: port@4 {
++			reg = <4>;
++			rsnd_endpoint4: endpoint {
++				remote-endpoint = <&adv7482_i2s>;
++
++				dai-tdm-slot-num = <8>;
++				dai-tdm-slot-width = <32>;
++				dai-format = "i2s";
++				mclk-fs = <256>;
++				bitclock-master = <&rsnd_endpoint4>;
++				frame-master = <&rsnd_endpoint4>;
++
++				capture = <&ssi4>;
++			};
++		};
+ 	};
+ };
+ 
+@@ -1150,7 +1171,7 @@
+ 			remote-endpoint = <&rsnd_endpoint0>;
+ 			};
+ 		};
+-	};
++    };
+ 
+ 	U6601: TPA6404@2a { /* Audio ID not sure. */
+ 		compatible = "idt,TPA6404";
+@@ -1305,6 +1326,7 @@
+ 
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		#clock-cells = <0>; /* the MCLK for I2S output */ 
+ 
+ 		interrupt-parent = <&gpio6>;
+ 		interrupt-names = "intrq1", "intrq2";
+@@ -1342,6 +1364,14 @@
+ 				remote-endpoint = <&csi20_in>;
+ 			};
+ 		};
++
++		port@c {
++			reg = <12>;
++			adv7482_i2s: endpoint {
++				remote-endpoint = <&rsnd_endpoint4>;
++				system-clock-direction-out;
++			};
++		};
+ 	};
+ 
+ 	U4600: MAX96712@29 { /* MAX96712 over level shift ic TXS0104(U4601) */
+diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+index 1b191afedecf..033f01c772bb 100644
+--- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
++++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+@@ -809,8 +809,8 @@
+ 	pinctrl-0 = <&sound_pins &sound_clk_pins>;
+ 	pinctrl-names = "default";
+ 
+-	/* Single DAI */
+-	#sound-dai-cells = <0>;
++       /* Single DAI */
++       #sound-dai-cells = <0>;
+ 
+ 	/* audio_clkout0/1/2/3 */
+ 	#clock-cells = <1>;
+@@ -836,6 +836,17 @@
+ 		 <&audio_clk_a>, <&cs2000>,
+ 		 <&audio_clk_c>,
+ 		 <&cpg CPG_CORE CPG_AUDIO_CLK_I>;
++	clock-names = "ssi-all",
++		      "ssi.9", "ssi.8", "ssi.7", "ssi.6",
++		      "ssi.5", "ssi.4", "ssi.3", "ssi.2",
++		      "ssi.1", "ssi.0",
++		      "src.9", "src.8", "src.7", "src.6",
++		      "src.5", "src.4", "src.3", "src.2",
++		      "src.1", "src.0",
++		      "mix.1", "mix.0",
++		      "ctu.1", "ctu.0",
++		      "dvc.0", "dvc.1",
++		      "clk_a", "clk_b", "clk_c", "clk_i";
+ 
+ 	ports {
+ 		#address-cells = <1>;
+diff --git a/drivers/media/i2c/adv748x/Makefile b/drivers/media/i2c/adv748x/Makefile
+index c0711e076f1d..870478c2ce42 100644
+--- a/drivers/media/i2c/adv748x/Makefile
++++ b/drivers/media/i2c/adv748x/Makefile
+@@ -2,6 +2,7 @@ adv748x-objs	:= \
+ 		adv748x-afe.o \
+ 		adv748x-core.o \
+ 		adv748x-csi2.o \
+-		adv748x-hdmi.o
++		adv748x-hdmi.o \
++		adv748x-dai.o
+ 
+ obj-$(CONFIG_VIDEO_ADV748X)	+= adv748x.o
+diff --git a/drivers/media/i2c/adv748x/adv748x-afe.c b/drivers/media/i2c/adv748x/adv748x-afe.c
+index f3b5d8ea27a4..94f6288706f7 100644
+--- a/drivers/media/i2c/adv748x/adv748x-afe.c
++++ b/drivers/media/i2c/adv748x/adv748x-afe.c
+@@ -10,17 +10,16 @@
+  * option) any later version.
+  */
+ 
++#include "adv748x.h"
++
+ #include <linux/delay.h>
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ #include <linux/v4l2-dv-timings.h>
+ 
+-#include <media/v4l2-ctrls.h>
+-#include <media/v4l2-device.h>
+ #include <media/v4l2-dv-timings.h>
+ #include <media/v4l2-ioctl.h>
+ 
+-#include "adv748x.h"
+ 
+ /* -----------------------------------------------------------------------------
+  * SDP
+diff --git a/drivers/media/i2c/adv748x/adv748x-core.c b/drivers/media/i2c/adv748x/adv748x-core.c
+index da8f0621a10b..21af9d8a48db 100644
+--- a/drivers/media/i2c/adv748x/adv748x-core.c
++++ b/drivers/media/i2c/adv748x/adv748x-core.c
+@@ -14,6 +14,8 @@
+  *	Kieran Bingham <kieran.bingham@ideasonboard.com>
+  */
+ 
++#include "adv748x.h"
++
+ #include <linux/delay.h>
+ #include <linux/errno.h>
+ #include <linux/i2c.h>
+@@ -24,13 +26,10 @@
+ #include <linux/slab.h>
+ #include <linux/v4l2-dv-timings.h>
+ 
+-#include <media/v4l2-ctrls.h>
+-#include <media/v4l2-device.h>
+ #include <media/v4l2-dv-timings.h>
+ #include <media/v4l2-ioctl.h>
+ #include <media/v4l2-fwnode.h>
+ 
+-#include "adv748x.h"
+ 
+ /* -----------------------------------------------------------------------------
+  * Register manipulation
+@@ -93,6 +92,14 @@ static const struct regmap_config adv748x_regmap_cnf[] = {
+ 		.max_register		= 0xff,
+ 		.cache_type		= REGCACHE_NONE,
+ 	},
++	{
++		.name			= "cbus",
++		.reg_bits		= 8,
++		.val_bits		= 8,
++
++		.max_register		= 0xff,
++		.cache_type		= REGCACHE_NONE,
++	},	
+ 	{
+ 		.name			= "cec",
+ 		.reg_bits		= 8,
+@@ -159,6 +166,7 @@ static int adv748x_i2c_addresses[ADV748X_PAGE_MAX] = {
+ 	ADV748X_I2C_EDID,
+ 	ADV748X_I2C_REPEATER,
+ 	ADV748X_I2C_INFOFRAME,
++	ADV748X_I2C_CBUS,
+ 	ADV748X_I2C_CEC,
+ 	ADV748X_I2C_SDP,
+ 	ADV748X_I2C_TXB,
+@@ -193,6 +201,13 @@ int adv748x_write(struct adv748x_state *state, u8 page, u8 reg, u8 value)
+ 	return regmap_write(state->regmap[page], reg, value);
+ }
+ 
++int adv748x_update_bits(struct adv748x_state *state, u8 page, u8 reg, u8 mask,
++			u8 value)
++{
++	return regmap_update_bits(state->regmap[page], reg, mask, value);
++}
++
++
+ /* adv748x_write_block(): Write raw data with a maximum of I2C_SMBUS_BLOCK_MAX
+  * size to one or more registers.
+  *
+@@ -418,6 +433,7 @@ int adv748x_txa_power(struct adv748x_state *state, bool on)
+ 	const struct adv748x_reg_value *txa_off;
+ 
+ 	val = txa_read(state, ADV748X_CSI_FS_AS_LS);
++
+ 	if (val < 0)
+ 		return val;
+ 
+@@ -782,6 +798,7 @@ static int adv748x_parse_dt(struct adv748x_state *state)
+ 		of_graph_parse_endpoint(ep_np, &ep);
+ 
+ 		v4l2_fwnode_endpoint_parse(of_fwnode_handle(ep_np), &v4l2_ep);
++
+ 		adv_info(state, "Endpoint %s on port %d",
+ 				of_node_full_name(ep.local_node),
+ 				ep.port);
+@@ -932,9 +949,19 @@ static int adv748x_probe(struct i2c_client *client,
+ 		adv_err(state, "Failed to probe TXB");
+ 		goto err_cleanup_txa;
+ 	}
++	
++	ret = adv748x_dai_init(&state->dai);
++	if (ret) {
++		adv_err(state, "Failed to probe DAI\n");
++		goto err_cleanup_txb;
++	}
+ 
+-	return 0;
++	//cp_write(state, ADV748X_CP_PAT_GEN, 0x81);	//RTX Test
+ 
++	return 0;
++	
++err_cleanup_txb:
++	adv748x_csi2_cleanup(&state->txb);
+ err_cleanup_txa:
+ 	adv748x_csi2_cleanup(&state->txa);
+ err_cleanup_afe:
+@@ -955,6 +982,7 @@ static int adv748x_remove(struct i2c_client *client)
+ {
+ 	struct adv748x_state *state = i2c_get_clientdata(client);
+ 
++	adv748x_dai_cleanup(&state->dai);
+ 	adv748x_afe_cleanup(&state->afe);
+ 	adv748x_hdmi_cleanup(&state->hdmi);
+ 
+diff --git a/drivers/media/i2c/adv748x/adv748x-csi2.c b/drivers/media/i2c/adv748x/adv748x-csi2.c
+index 3356c72cd1a0..448724829843 100644
+--- a/drivers/media/i2c/adv748x/adv748x-csi2.c
++++ b/drivers/media/i2c/adv748x/adv748x-csi2.c
+@@ -8,16 +8,13 @@
+  * Free Software Foundation;  either version 2 of the  License, or (at your
+  * option) any later version.
+  */
++#include "adv748x.h"
+ 
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ 
+-#include <media/v4l2-ctrls.h>
+-#include <media/v4l2-device.h>
+ #include <media/v4l2-ioctl.h>
+ 
+-#include "adv748x.h"
+-
+ static bool is_txa(struct adv748x_csi2 *tx)
+ {
+ 	return tx == &tx->state->txa;
+diff --git a/drivers/media/i2c/adv748x/adv748x-dai.c b/drivers/media/i2c/adv748x/adv748x-dai.c
+new file mode 100644
+index 000000000000..e71d5bcb53f4
+--- /dev/null
++++ b/drivers/media/i2c/adv748x/adv748x-dai.c
+@@ -0,0 +1,285 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Driver for Analog Devices ADV748X HDMI receiver with AFE
++ * The implementation of DAI.
++ */
++
++#include "adv748x.h"
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <sound/pcm_params.h>
++
++#define state_of(soc_dai) \
++	adv748x_dai_to_state(container_of((soc_dai)->driver, \
++					  struct adv748x_dai, drv))
++#define mclk_of(state) ((state)->dai.mclk_hw->clk)
++
++static const char ADV748X_DAI_NAME[] = "adv748x-i2s";
++
++static int set_audio_pads_state(struct adv748x_state *state, int on)
++{
++	return io_clrset(state, ADV748X_IO_PAD_CONTROLS,
++			 ADV748X_IO_PAD_CONTROLS_TRI_AUD |
++			 ADV748X_IO_PAD_CONTROLS_PDN_AUD,
++			 on ? 0 : 0xff);
++}
++
++static int set_dpll_mclk_fs(struct adv748x_state *state, int fs)
++{
++	return dpll_clrset(state, ADV748X_DPLL_MCLK_FS,
++			   ADV748X_DPLL_MCLK_FS_N_MASK, (fs / 128) - 1);
++}
++
++static int set_i2s_format(struct adv748x_state *state, uint outmode,
++			  uint bitwidth)
++{
++	return hdmi_clrset(state, ADV748X_HDMI_I2S,
++			   ADV748X_HDMI_I2SBITWIDTH_MASK |
++			   ADV748X_HDMI_I2SOUTMODE_MASK,
++			   (outmode << ADV748X_HDMI_I2SOUTMODE_SHIFT) |
++			   bitwidth);
++}
++
++static int set_i2s_tdm_mode(struct adv748x_state *state, int is_tdm)
++{
++	int ret;
++
++	ret = hdmi_clrset(state, ADV748X_HDMI_AUDIO_MUTE_SPEED,
++			  ADV748X_MAN_AUDIO_DL_BYPASS |
++			  ADV748X_AUDIO_DELAY_LINE_BYPASS,
++			  is_tdm ? 0xff : 0);
++	if (ret < 0)
++		return ret;
++	ret = hdmi_clrset(state, ADV748X_HDMI_REG_6D,
++			  ADV748X_I2S_TDM_MODE_ENABLE,
++			  is_tdm ? 0xff : 0);
++	return ret;
++}
++
++static int set_audio_mute(struct adv748x_state *state, int enable)
++{
++	return hdmi_clrset(state, ADV748X_HDMI_MUTE_CTRL,
++			   ADV748X_HDMI_MUTE_CTRL_MUTE_AUDIO,
++			   enable ? 0xff : 0);
++}
++
++static int adv748x_dai_set_sysclk(struct snd_soc_dai *dai,
++				  int clk_id, unsigned int freq, int dir)
++{	
++	struct adv748x_state *state = state_of(dai);
++
++	/* currently supporting only one fixed rate clock */
++	if (clk_id != 0 || freq != clk_get_rate(mclk_of(state))) {
++		dev_err(dai->dev, "invalid clock (%d) or frequency (%u, dir %d)\n",
++			clk_id, freq, dir);
++		return -EINVAL;
++	}
++	state->dai.freq = freq;
++	return 0;
++}
++
++static int adv748x_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
++{
++	struct adv748x_state *state = state_of(dai);
++	int ret = 0;
++
++	if ((fmt & SND_SOC_DAIFMT_MASTER_MASK) != SND_SOC_DAIFMT_CBM_CFM) {
++		dev_err(dai->dev, "only I2S master clock mode supported\n");
++		ret = -EINVAL;
++		goto done;
++	}
++	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
++	case SND_SOC_DAI_FORMAT_I2S:
++		state->dai.tdm = 0;
++		state->dai.fmt = ADV748X_I2SOUTMODE_I2S;
++		break;
++	case SND_SOC_DAI_FORMAT_RIGHT_J:
++		state->dai.tdm = 1;
++		state->dai.fmt = ADV748X_I2SOUTMODE_RIGHT_J;
++		break;
++	case SND_SOC_DAI_FORMAT_LEFT_J:
++		state->dai.tdm = 1;
++		state->dai.fmt = ADV748X_I2SOUTMODE_LEFT_J;
++		break;
++	default:
++		dev_err(dai->dev, "only i2s, left_j and right_j supported\n");
++		ret = -EINVAL;
++		goto done;
++	}
++	if ((fmt & SND_SOC_DAIFMT_INV_MASK) != SND_SOC_DAIFMT_NB_NF) {
++		dev_err(dai->dev, "only normal bit clock + frame supported\n");
++		ret = -EINVAL;
++	}
++done:
++	return ret;
++}
++
++static int adv748x_dai_startup(struct snd_pcm_substream *sub, struct snd_soc_dai *dai)
++{
++	int ret;
++	struct adv748x_state *state = state_of(dai);
++
++	if (sub->stream != SNDRV_PCM_STREAM_CAPTURE)
++		return -EINVAL;
++	//return set_audio_pads_state(state, 1);
++	ret = set_audio_pads_state(state, 1);
++	if (ret)
++		goto fail;
++	ret = clk_prepare_enable(mclk_of(state));
++	if (ret)
++		goto fail_pwdn;
++		
++	return 0;
++fail_pwdn:
++	set_audio_pads_state(state, 0);
++fail:
++	return ret;	
++}
++
++static int adv748x_dai_hw_params(struct snd_pcm_substream *sub,
++				 struct snd_pcm_hw_params *params,
++				 struct snd_soc_dai *dai)
++{	
++	int ret;
++	struct adv748x_state *state = state_of(dai);
++	uint fs = state->dai.freq / params_rate(params);
++
++	dev_dbg(dai->dev, "dai %s substream %s rate=%u (fs=%u), channels=%u sample width=%u(%u)\n",
++		dai->name, sub->name,
++		params_rate(params), fs,
++		params_channels(params),
++		params_width(params),
++		params_physical_width(params));
++	switch (fs) {
++	case 128:
++	case 256:
++	case 384:
++	case 512:
++	case 640:
++	case 768:
++		break;
++	default:
++		ret = -EINVAL;
++		dev_err(dai->dev, "invalid clock frequency (%u) or rate (%u)\n",
++			state->dai.freq, params_rate(params));
++		goto done;
++	}
++	ret = set_dpll_mclk_fs(state, fs);
++	if (ret)
++		goto done;
++	ret = set_i2s_tdm_mode(state, state->dai.tdm);
++	if (ret)
++		goto done;
++	ret = set_i2s_format(state, state->dai.fmt, params_width(params));
++done:
++	return ret;
++}
++
++static int adv748x_dai_mute_stream(struct snd_soc_dai *dai, int mute, int dir)
++{
++	struct adv748x_state *state = state_of(dai);
++
++	return set_audio_mute(state, mute);
++}
++
++static void adv748x_dai_shutdown(struct snd_pcm_substream *sub, struct snd_soc_dai *dai)
++{
++	struct adv748x_state *state = state_of(dai);
++	
++	clk_disable_unprepare(mclk_of(state));
++	set_audio_pads_state(state, 0);
++}
++
++static const struct snd_soc_dai_ops adv748x_dai_ops = {
++	.set_sysclk = adv748x_dai_set_sysclk,
++	.set_fmt = adv748x_dai_set_fmt,
++	.startup = adv748x_dai_startup,
++	.hw_params = adv748x_dai_hw_params,
++	.mute_stream = adv748x_dai_mute_stream,
++	.shutdown = adv748x_dai_shutdown,
++};
++
++static	int adv748x_of_xlate_dai_name(struct snd_soc_component *component,
++				      struct of_phandle_args *args,
++				      const char **dai_name)
++{
++	if (dai_name)
++		*dai_name = ADV748X_DAI_NAME;
++	return 0;
++}
++
++static const struct snd_soc_component_driver adv748x_codec = {
++	.of_xlate_dai_name = adv748x_of_xlate_dai_name,
++};
++
++int adv748x_dai_init(struct adv748x_dai *dai)
++{
++	int ret;
++	struct adv748x_state *state = adv748x_dai_to_state(dai);
++
++	if (!state->endpoints[ADV748X_PORT_I2S]) {
++		adv_info(state, "no I2S port, DAI disabled\n");
++		ret = 0;
++		goto fail;
++	}
++
++	dai->mclk_name = kasprintf(GFP_KERNEL, "%s.%s-i2s-mclk",
++				   state->dev->driver->name,
++				   dev_name(state->dev));
++
++	if (!dai->mclk_name) {
++		ret = -ENOMEM;
++		adv_err(state, "No memory for MCLK\n");
++		goto fail;
++	}
++	dai->mclk_hw = clk_hw_register_fixed_rate(state->dev, dai->mclk_name,
++						  NULL, 0, 12288000);
++	if (IS_ERR(dai->mclk_hw)) {
++		ret = PTR_ERR(dai->mclk_hw);
++		adv_err(state, "Failed to register MCLK (%d)\n", ret);
++		goto fail;
++	}
++	ret = of_clk_add_hw_provider(state->dev->of_node, of_clk_hw_simple_get,
++				     dai->mclk_hw->clk);
++	if (ret < 0) {
++		adv_err(state, "Failed to add MCLK provider (%d)\n", ret);
++		goto unreg_mclk;
++	}
++	dai->drv.name = ADV748X_DAI_NAME;
++	dai->drv.ops = &adv748x_dai_ops;
++	dai->drv.capture = (const struct snd_soc_pcm_stream){
++		.stream_name	= "Capture",
++		.channels_min	= 8,
++		.channels_max	= 8,
++		.rates = SNDRV_PCM_RATE_48000,
++		.formats = SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_U24_LE,
++	};
++
++	ret = devm_snd_soc_register_component(state->dev, &adv748x_codec,
++					      &dai->drv, 1);
++	if (ret < 0) {
++		adv_err(state, "Failed to register the codec (%d)\n", ret);
++		goto cleanup_mclk;
++	}
++	
++	io_write(state, ADV748X_IO_PAD_CONTROLS, 0xDD);
++
++	return 0;
++
++cleanup_mclk:
++	of_clk_del_provider(state->dev->of_node);
++unreg_mclk:
++	clk_hw_unregister_fixed_rate(dai->mclk_hw);
++fail:
++	return ret;
++}
++
++void adv748x_dai_cleanup(struct adv748x_dai *dai)
++{
++	struct adv748x_state *state = adv748x_dai_to_state(dai);
++
++	of_clk_del_provider(state->dev->of_node);
++	clk_hw_unregister_fixed_rate(dai->mclk_hw);
++	kfree(dai->mclk_name);
++}
+diff --git a/drivers/media/i2c/adv748x/adv748x-hdmi.c b/drivers/media/i2c/adv748x/adv748x-hdmi.c
+index 6d71b85688a3..73e2ed1d8378 100644
+--- a/drivers/media/i2c/adv748x/adv748x-hdmi.c
++++ b/drivers/media/i2c/adv748x/adv748x-hdmi.c
+@@ -8,18 +8,16 @@
+  * Free Software Foundation;  either version 2 of the  License, or (at your
+  * option) any later version.
+  */
++#include "adv748x.h"
+ 
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ 
+-#include <media/v4l2-ctrls.h>
+-#include <media/v4l2-device.h>
+ #include <media/v4l2-dv-timings.h>
+ #include <media/v4l2-ioctl.h>
+ 
+ #include <uapi/linux/v4l2-dv-timings.h>
+ 
+-#include "adv748x.h"
+ 
+ /* -----------------------------------------------------------------------------
+  * HDMI and CP
+diff --git a/drivers/media/i2c/adv748x/adv748x.h b/drivers/media/i2c/adv748x/adv748x.h
+index e96c4e445dbc..abf5b3445732 100644
+--- a/drivers/media/i2c/adv748x/adv748x.h
++++ b/drivers/media/i2c/adv748x/adv748x.h
+@@ -23,6 +23,9 @@
+  */
+ 
+ #include <linux/i2c.h>
++#include <sound/soc.h>
++#include <media/v4l2-ctrls.h>
++#include <media/v4l2-device.h>
+ 
+ #ifndef _ADV748X_H_
+ #define _ADV748X_H_
+@@ -33,8 +36,9 @@
+ #define ADV748X_I2C_CP			0x22	/* CP Map */
+ #define ADV748X_I2C_HDMI		0x34	/* HDMI Map */
+ #define ADV748X_I2C_EDID		0x36	/* EDID Map */
+-#define ADV748X_I2C_REPEATER		0x32	/* HDMI RX Repeater Map */
+-#define ADV748X_I2C_INFOFRAME		0x31	/* HDMI RX InfoFrame Map */
++#define ADV748X_I2C_REPEATER	0x32	/* HDMI RX Repeater Map */
++#define ADV748X_I2C_INFOFRAME	0x31	/* HDMI RX InfoFrame Map */
++#define ADV748X_I2C_CBUS		0x30	/* CBUS */
+ #define ADV748X_I2C_CEC			0x41	/* CEC Map */
+ #define ADV748X_I2C_SDP			0x79	/* SDP Map */
+ #define ADV748X_I2C_TXB			0x48	/* CSI-TXB Map */
+@@ -48,6 +52,7 @@ enum adv748x_page {
+ 	ADV748X_PAGE_EDID,
+ 	ADV748X_PAGE_REPEATER,
+ 	ADV748X_PAGE_INFOFRAME,
++	ADV748X_PAGE_CBUS,
+ 	ADV748X_PAGE_CEC,
+ 	ADV748X_PAGE_SDP,
+ 	ADV748X_PAGE_TXB,
+@@ -78,7 +83,8 @@ enum adv748x_ports {
+ 	ADV748X_PORT_TTL = 9,
+ 	ADV748X_PORT_TXA = 10,
+ 	ADV748X_PORT_TXB = 11,
+-	ADV748X_PORT_MAX = 12,
++	ADV748X_PORT_I2S = 12,
++	ADV748X_PORT_MAX = 13,
+ };
+ 
+ enum adv748x_csi2_pads {
+@@ -162,6 +168,13 @@ struct adv748x_afe {
+ 	container_of(ctrl->handler, struct adv748x_afe, ctrl_hdl)
+ #define adv748x_sd_to_afe(sd) container_of(sd, struct adv748x_afe, sd)
+ 
++struct adv748x_dai {
++	struct snd_soc_dai_driver drv;
++	struct clk_hw *mclk_hw;
++	char *mclk_name;
++	unsigned int freq, fmt, tdm;
++};
++
+ /**
+  * struct adv748x_state - State of ADV748X
+  * @dev:		(OF) device
+@@ -178,6 +191,7 @@ struct adv748x_afe {
+  * @afe:		state of AFE receiver context
+  * @txa:		state of TXA transmitter context
+  * @txb:		state of TXB transmitter context
++ * @mclk:		MCLK clock of the I2S port
+  */
+ struct adv748x_state {
+ 	struct device *dev;
+@@ -193,10 +207,12 @@ struct adv748x_state {
+ 	struct adv748x_afe afe;
+ 	struct adv748x_csi2 txa;
+ 	struct adv748x_csi2 txb;
++	struct adv748x_dai dai;
+ };
+ 
+ #define adv748x_hdmi_to_state(h) container_of(h, struct adv748x_state, hdmi)
+ #define adv748x_afe_to_state(a) container_of(a, struct adv748x_state, afe)
++#define adv748x_dai_to_state(p) container_of(p, struct adv748x_state, dai)
+ 
+ #define adv_err(a, fmt, arg...)	dev_err(a->dev, fmt, ##arg)
+ #define adv_info(a, fmt, arg...) dev_info(a->dev, fmt, ##arg)
+@@ -218,6 +234,11 @@ struct adv748x_state {
+ 
+ #define ADV748X_IO_VID_STD		0x05
+ 
++#define ADV748X_IO_PAD_CONTROLS		0x0e
++#define ADV748X_IO_PAD_CONTROLS_TRI_AUD	BIT(5)
++#define ADV748X_IO_PAD_CONTROLS_PDN_AUD	BIT(1)
++#define ADV748X_IO_PAD_CONTROLS1	0x1d
++
+ #define ADV748X_IO_10			0x10	/* io_reg_10 */
+ #define ADV748X_IO_10_CSI4_EN		BIT(7)
+ #define ADV748X_IO_10_CSI1_EN		BIT(6)
+@@ -229,7 +250,21 @@ struct adv748x_state {
+ 
+ #define ADV748X_IO_SLAVE_ADDR_BASE	0xf2
+ 
++/* DPLL Map */
++#define ADV748X_DPLL_MCLK_FS		0xb5
++#define ADV748X_DPLL_MCLK_FS_N_MASK	GENMASK(2, 0)
++
+ /* HDMI RX Map */
++#define ADV748X_HDMI_I2S		0x03	/* I2S mode and width */
++#define ADV748X_HDMI_I2SBITWIDTH_MASK	GENMASK(4, 0)
++#define ADV748X_HDMI_I2SOUTMODE_SHIFT	5
++#define ADV748X_HDMI_I2SOUTMODE_MASK	\
++	GENMASK(6, ADV748X_HDMI_I2SOUTMODE_SHIFT)
++#define ADV748X_I2SOUTMODE_I2S 0
++#define ADV748X_I2SOUTMODE_RIGHT_J 1
++#define ADV748X_I2SOUTMODE_LEFT_J 2
++#define ADV748X_I2SOUTMODE_SPDIF 3
++
+ #define ADV748X_HDMI_LW1		0x07	/* line width_1 */
+ #define ADV748X_HDMI_LW1_VERT_FILTER	BIT(7)
+ #define ADV748X_HDMI_LW1_DE_REGEN	BIT(5)
+@@ -241,6 +276,16 @@ struct adv748x_state {
+ #define ADV748X_HDMI_F1H1		0x0b	/* field1 height_1 */
+ #define ADV748X_HDMI_F1H1_INTERLACED	BIT(5)
+ 
++#define ADV748X_HDMI_MUTE_CTRL		0x1a
++#define ADV748X_HDMI_MUTE_CTRL_MUTE_AUDIO BIT(4)
++#define ADV748X_HDMI_MUTE_CTRL_WAIT_UNMUTE_MASK	GENMASK(3, 1)
++#define ADV748X_HDMI_MUTE_CTRL_NOT_AUTO_UNMUTE	BIT(0)
++
++#define ADV748X_HDMI_AUDIO_MUTE_SPEED	0x0f
++#define ADV748X_HDMI_AUDIO_MUTE_SPEED_MASK	GENMASK(4, 0)
++#define ADV748X_MAN_AUDIO_DL_BYPASS BIT(7)
++#define ADV748X_AUDIO_DELAY_LINE_BYPASS BIT(6)
++
+ #define ADV748X_HDMI_HFRONT_PORCH	0x20	/* hsync_front_porch_1 */
+ #define ADV748X_HDMI_HFRONT_PORCH_MASK	0x1fff
+ 
+@@ -262,6 +307,9 @@ struct adv748x_state {
+ #define ADV748X_HDMI_TMDS_1		0x51	/* hdmi_reg_51 */
+ #define ADV748X_HDMI_TMDS_2		0x52	/* hdmi_reg_52 */
+ 
++#define ADV748X_HDMI_REG_6D		0x6d	/* hdmi_reg_6d */
++#define ADV748X_I2S_TDM_MODE_ENABLE BIT(7)
++
+ /* HDMI RX Repeater Map */
+ #define ADV748X_REPEATER_EDID_SZ	0x70	/* primary_edid_size */
+ #define ADV748X_REPEATER_EDID_SZ_SHIFT	4
+@@ -375,25 +423,34 @@ int adv748x_write(struct adv748x_state *state, u8 page, u8 reg, u8 value);
+ int adv748x_write_block(struct adv748x_state *state, int client_page,
+ 			unsigned int init_reg, const void *val,
+ 			size_t val_len);
++int adv748x_update_bits(struct adv748x_state *state, u8 page, u8 reg,
++			u8 mask, u8 value);
+ 
+ #define io_read(s, r) adv748x_read(s, ADV748X_PAGE_IO, r)
+ #define io_write(s, r, v) adv748x_write(s, ADV748X_PAGE_IO, r, v)
+-#define io_clrset(s, r, m, v) io_write(s, r, (io_read(s, r) & ~(m)) | (v))
++#define io_clrset(s, r, m, v) adv748x_update_bits(s, ADV748X_PAGE_IO, r, m, v)
++
+ 
+ #define hdmi_read(s, r) adv748x_read(s, ADV748X_PAGE_HDMI, r)
+ #define hdmi_read16(s, r, m) (((hdmi_read(s, r) << 8) | hdmi_read(s, (r)+1)) & (m))
+ #define hdmi_write(s, r, v) adv748x_write(s, ADV748X_PAGE_HDMI, r, v)
++#define hdmi_clrset(s, r, m, v) \
++	adv748x_update_bits(s, ADV748X_PAGE_HDMI, r, m, v)
++
++#define dpll_read(s, r) adv748x_read(s, ADV748X_PAGE_DPLL, r)
++#define dpll_clrset(s, r, m, v) \
++	adv748x_update_bits(s, ADV748X_PAGE_DPLL, r, m, v)
+ 
+ #define repeater_read(s, r) adv748x_read(s, ADV748X_PAGE_REPEATER, r)
+ #define repeater_write(s, r, v) adv748x_write(s, ADV748X_PAGE_REPEATER, r, v)
+ 
+ #define sdp_read(s, r) adv748x_read(s, ADV748X_PAGE_SDP, r)
+ #define sdp_write(s, r, v) adv748x_write(s, ADV748X_PAGE_SDP, r, v)
+-#define sdp_clrset(s, r, m, v) sdp_write(s, r, (sdp_read(s, r) & ~(m)) | (v))
++#define sdp_clrset(s, r, m, v) adv748x_update_bits(s, ADV748X_PAGE_SDP, r, m, v)
+ 
+ #define cp_read(s, r) adv748x_read(s, ADV748X_PAGE_CP, r)
+ #define cp_write(s, r, v) adv748x_write(s, ADV748X_PAGE_CP, r, v)
+-#define cp_clrset(s, r, m, v) cp_write(s, r, (cp_read(s, r) & ~(m)) | (v))
++#define cp_clrset(s, r, m, v) adv748x_update_bits(s, ADV748X_PAGE_CP, r, m, v)
+ 
+ #define txa_read(s, r) adv748x_read(s, ADV748X_PAGE_TXA, r)
+ #define txb_read(s, r) adv748x_read(s, ADV748X_PAGE_TXB, r)
+@@ -430,5 +487,7 @@ int adv748x_csi2_set_pixelrate(struct v4l2_subdev *sd, s64 rate);
+ int adv748x_hdmi_init(struct adv748x_hdmi *hdmi);
+ void adv748x_hdmi_cleanup(struct adv748x_hdmi *hdmi);
+ int adv748x_hdmi_set_resume_edid(struct adv748x_hdmi *hdmi);
++int adv748x_dai_init(struct adv748x_dai *);
++void adv748x_dai_cleanup(struct adv748x_dai *);
+ 
+ #endif /* _ADV748X_H_ */
+-- 
+2.25.1
+
