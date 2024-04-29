@@ -1,4 +1,5 @@
 #!/bin/bash
+set raptor adas
 
 WORK=`pwd`
 echo $WORK

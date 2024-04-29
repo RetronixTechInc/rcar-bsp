@@ -1,0 +1,17 @@
+## Building Instructions on Linux Host PC ##
+
+1. Recommanded OS: 
+Ubuntu 20.04 LTS (64bit only)
+
+2. Installation of required tools and libraries:
+$ sudo apt-get install gawk wget git-core diffstat unzip texinfo gcc-multilib \
+build-essential chrpath socat cpio python3 python3-pip python3-pexpect \
+xz-utils debianutils iputils-ping python3-git python3-jinja2 libegl1-mesa \
+libsdl1.2-dev pylint3 xterm libarchive-zip-perl
+
+3. Using build script:
+This script only build image of rcar-image-adas for MACHINE of raptor
+$ cd ${WORK}
+$ ./build_yocto_v3p18.sh
+
+
