@@ -19,7 +19,7 @@ git clone https://github.com/RetronixTechInc/rcar-bsp.git -b v4h-raptor/meta-rtx
 
 
 case "$1" in
-"all" | "whitehawk" | "eagle" | "condor")
+"all" | "raptor" | "whitehawk" | "eagle" | "condor")
     echo "Use build configuration for $1 board"
     ;;
 *)
