@@ -54,7 +54,7 @@ cd $WORK
 
 source $WORK/poky/oe-init-build-env build-$1-$2
 
-cp $WORK/meta-rtx/docs/sample/conf/$1/$2/*.conf conf/
+cp $WORK/meta-renesas/meta-rtx/docs/sample/conf/$1/$2/*.conf conf/
 
 echo "The build directory is $(pwd) "
 
@@ -62,7 +62,7 @@ if [ $2 = "bsp" ]; then
     echo "Run command: #bitbake rcar-image-minimal"
     bitbake rcar-image-minimal
 elif [ $2 = "adas" ]; then
-    if [ $1 = "whitehawk" ]; then
+    if [ $1 = "whitehawk" ] || [ $1 = "raptor" ]; then
         if [[ "${GFX_FILE_PATH}" != "" ]]; then
             sed -i 's|#MACHINE_FEATURES_append = " gsx"|MACHINE_FEATURES_append = " gsx"|g' conf/local.conf
         fi
@@ -82,6 +82,7 @@ if [ $OPTION = "adas" ]; then
 fi
 
 if [ $BOARD = "all" ]; then
+    build_function raptor $OPTION
     build_function whitehawk $OPTION
     build_function condor $OPTION
 else
