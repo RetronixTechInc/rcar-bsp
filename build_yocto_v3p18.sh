@@ -15,7 +15,7 @@ cd $WORK/meta-openembedded
 git checkout -b tmp 814eec96c2a29172da57a425a3609f8b6fcc6afe
 cd $WORK/meta-renesas
 git checkout -b tmp 42ba4a6d45d5479200b6baf7d9cbffb4d1a0d7f5
-git clone https://github.com/RetronixTechInc/rcar-bsp.git -b v4h-raptor/meta-rtx meta-rtx
+git clone https://github.com/RetronixTechInc/meta-rtx-arm.git -b v4h-raptor/meta-rtx meta-rtx
 
 
 case "$1" in
