@@ -26,6 +26,11 @@ else
 	sed 's/rcar-kernel.git/rcar-gen4-kernel.git/g' -i ${KERNEL_RECIPE}
 fi
 
+# modify uboot recipe for sdk3p28
+UBOOT_BRANCH='"v4h-raptor\/v2022.01\/rcar-6.0.0.rc9"'
+UBOOT_RECIPE="meta-rtx/recipes-bsp/u-boot/u-boot_2022.01.bbappend"
+sed "s/RTX_BRANCH = .*/RTX_BRANCH = ${UBOOT_BRANCH}/g" -i ${UBOOT_RECIPE}
+
 case "$1" in
 "all" | "raptor" | "grayhawk" | "whitehawk" | "eagle" | "condor")
     echo "Use build configuration for $1 board"

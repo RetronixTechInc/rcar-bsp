@@ -17,7 +17,7 @@ cd $WORK/meta-renesas
 git checkout -b tmp 42ba4a6d45d5479200b6baf7d9cbffb4d1a0d7f5
 git clone https://github.com/RetronixTechInc/meta-rtx-arm.git -b v4h-raptor/meta-rtx meta-rtx
 
-# modify kernel recipe for sdk3p28
+# modify kernel recipe for sdk3p18
 KERNEL_BRANCH='"v4h-raptor\/v5.10.147\/rcar-5.2.0.rc10"'
 KERNEL_RECIPE="meta-rtx/recipes-kernel/linux/linux-renesas_5.10.bbappend"
 sed "s/RTX_BSP_BRANCH = .*/RTX_BSP_BRANCH = ${KERNEL_BRANCH}/g" -i ${KERNEL_RECIPE}
@@ -26,6 +26,11 @@ if [ $3 = "release" ]; then
 else
 	sed 's/rcar-kernel.git/rcar-gen4-kernel.git/g' -i ${KERNEL_RECIPE}
 fi
+
+# modify uboot recipe for sdk3p18
+UBOOT_BRANCH='"v4h-raptor\/v2022.01\/rcar-6.0.0.rc5"'
+UBOOT_RECIPE="meta-rtx/recipes-bsp/u-boot/u-boot_2022.01.bbappend"
+sed "s/RTX_BRANCH = .*/RTX_BRANCH = ${UBOOT_BRANCH}/g" -i ${UBOOT_RECIPE}
 
 case "$1" in
 "all" | "raptor" | "whitehawk" | "eagle" | "condor")
