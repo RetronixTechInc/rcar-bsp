@@ -1,6 +1,8 @@
 #!/bin/bash
 set raptor adas develop
 
+#DEF_DOWNLOADS_FOLD='/home/tom/data2/source-code/yocto/downloads'
+
 WORK=`pwd`
 echo $WORK
 
@@ -60,6 +62,22 @@ cd $WORK
 source $WORK/poky/oe-init-build-env build-$1-$2
 
 cp $WORK/meta-renesas/meta-rtx/docs/sample/conf/$1/$2/*.conf conf/
+if [ -d "${DEF_DOWNLOADS_FOLD}" ] ; then
+    if [ -L downloads ]; then
+        rm downloads
+    fi
+    ln -s ${DEF_DOWNLOADS_FOLD} downloads
+else
+    while true; do
+        read -p "Are you sure to download all packages?[y/n] " yn
+        case $yn in
+            [Yy]* ) break;;
+            [Nn]* ) echo "***Please, Define DEF_DOWNLOADS_FOLD for the download fold link.***"; 
+                    exit;;
+            * ) echo "Please answer yes or no.";;
+        esac
+    done
+fi
 
 echo "The build directory is $(pwd) "
 
