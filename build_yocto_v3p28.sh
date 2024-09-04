@@ -21,11 +21,14 @@ git clone https://github.com/RetronixTechInc/meta-rtx-arm.git -b v4h-raptor/meta
 # modify kernel recipe for sdk3p28
 KERNEL_BRANCH='"v4h-raptor\/v5.10.147\/rcar-5.2.0.rc19"'
 KERNEL_RECIPE="meta-rtx/recipes-kernel/linux/linux-renesas_5.10.bbappend"
+KERNEL_URL_REL='"git:\/\/github.com\/RetronixTechInc\/rcar-kernel.git;protocol=https"'
+KERNEL_URL_DEV='"git:\/\/git@github.com\/RetronixTechInc\/rcar-gen4-kernel.git;protocol=ssh"'
+
 sed "s/RTX_BSP_BRANCH = .*/RTX_BSP_BRANCH = ${KERNEL_BRANCH}/g" -i ${KERNEL_RECIPE}
 if [ $3 = "release" ]; then
-	sed 's/rcar-gen4-kernel.git/rcar-kernel.git/g' -i ${KERNEL_RECIPE}
+	sed "s/RTX_BSP_URL = .*/RTX_BSP_URL = ${KERNEL_URL_REL}/g" -i ${KERNEL_RECIPE}
 else
-	sed 's/rcar-kernel.git/rcar-gen4-kernel.git/g' -i ${KERNEL_RECIPE}
+	sed "s/RTX_BSP_URL = .*/RTX_BSP_URL = ${KERNEL_URL_DEV}/g" -i ${KERNEL_RECIPE}
 fi
 
 # modify uboot recipe for sdk3p28
