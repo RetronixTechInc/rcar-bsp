@@ -1,5 +1,5 @@
 #!/bin/bash
-set raptor adas develop
+set raptor adas
 
 #DEF_DOWNLOADS_FOLD='/home/tom/data2/source-code/yocto/downloads'
 
@@ -25,10 +25,10 @@ KERNEL_URL_REL='"git:\/\/github.com\/RetronixTechInc\/rcar-kernel.git;protocol=h
 KERNEL_URL_DEV='"git:\/\/git@github.com\/RetronixTechInc\/rcar-gen4-kernel.git;protocol=ssh"'
 
 sed "s/RTX_BSP_BRANCH = .*/RTX_BSP_BRANCH = ${KERNEL_BRANCH}/g" -i ${KERNEL_RECIPE}
-if [ $3 = "release" ]; then
-	sed "s/RTX_BSP_URL = .*/RTX_BSP_URL = ${KERNEL_URL_REL}/g" -i ${KERNEL_RECIPE}
-else
+if [ $3 = "develop" ]; then
 	sed "s/RTX_BSP_URL = .*/RTX_BSP_URL = ${KERNEL_URL_DEV}/g" -i ${KERNEL_RECIPE}
+else
+	sed "s/RTX_BSP_URL = .*/RTX_BSP_URL = ${KERNEL_URL_REL}/g" -i ${KERNEL_RECIPE}
 fi
 
 # modify uboot recipe for sdk3p28
