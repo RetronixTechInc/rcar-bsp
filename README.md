@@ -17,7 +17,7 @@ $ ./build_yocto_v3p18.sh
 * Write IPL to PCBA reference to 101_RRC-Raptor-V4H_Porting_Guide.pdf in section 4.1.
 
 ##  Download FS images using pre-build or building images:
-* Download pre-build image: [RRC-Raptor-Linux-images.zip](https://drive.google.com/file/d/1T58m_WcsJv3Re5I7cOWSABEyURbllz4v/view?usp=sharing)
+* Download pre-build image: [RRC-Raptor-FileSystem-images.zip](https://drive.google.com/file/d/1T58m_WcsJv3Re5I7cOWSABEyURbllz4v/view?usp=sharing)
 * Uncompress the download zip file.
 * Write FS to PCBA reference to 101_RRC-Raptor-V4H_Porting_Guide.pdf from sections 4.2 to 4.4.
 
