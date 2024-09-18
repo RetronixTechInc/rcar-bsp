@@ -1,17 +1,24 @@
-## Building Instructions on Linux Host PC ##
+# Quick start[Ubuntu 20.04 LTS (64bit only)]
 
-1. Recommanded OS: 
-Ubuntu 20.04 LTS (64bit only)
+1. Download script
+git clone https://github.com/RetronixTechInc/rcar-bsp.git -b v4h-raptor
 
-2. Installation of required tools and libraries:
-$ sudo apt-get install gawk wget git-core diffstat unzip texinfo gcc-multilib \
-build-essential chrpath socat cpio python3 python3-pip python3-pexpect \
-xz-utils debianutils iputils-ping python3-git python3-jinja2 libegl1-mesa \
-libsdl1.2-dev pylint3 xterm libarchive-zip-perl
-
-3. Using build script:
-This script only build image of rcar-image-adas for MACHINE of raptor
-$ cd ${WORK}
+2. Using build script(build images of rcar-image-adas)
+$ cd rcar-bsp
 $ ./build_yocto_v3p18.sh
+
+----- Build and Download images to PCBA refer to 101_RRC-Raptor-V4H_Porting_Guide.pdf -----
+# Build BSP and write to PCBA
+* Please reference to 101_RRC-Raptor-V4H_Porting_Guide.pdf in chapter 3.
+
+# Dowload IPL images and write to PCBA:
+* Download IPL images: [IVI-16G-Android10.zip](https://drive.google.com/file/d/1R99EayEp9QGpzfY5o50F10v9c7Iv2L86/view?usp=drive_link)
+* Uncompress the download zip file.
+* Write IPL to PCBA reference to 101_RRC-Raptor-V4H_Porting_Guide.pdf in section 4.1.
+
+# Use pre-build or building images:
+* Download pre-build image: [RRC-Raptor-Linux-images.zip]()
+* Uncompress the download zip file.
+* Then reference to 101_RRC-Raptor-V4H_Porting_Guide.pdf from sections 4.2 to 4.4.
 
 
