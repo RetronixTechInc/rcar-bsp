@@ -1,6 +1,6 @@
 # Quick start[Ubuntu 20.04 LTS (64bit only)]
 
-1. Download script
+## 1. Download script
 git clone https://github.com/RetronixTechInc/rcar-bsp.git -b v4h-raptor
 
 2. Using build script(build images of rcar-image-adas)
