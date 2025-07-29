@@ -1,5 +1,5 @@
 #!/bin/bash
-set raptor adas
+set v4h-sbc adas
 
 #DEF_DOWNLOADS_FOLD='/home/tom/data2/source-code/yocto/downloads'
 
@@ -19,7 +19,9 @@ git checkout -b tmp 89ca1415e3598789e9004363f9a38c1b3f41912d
 git clone https://github.com/RetronixTechInc/meta-rtx-arm.git -b v4h-raptor/meta-rtx meta-rtx
 
 # modify kernel recipe for sdk3p28
-KERNEL_BRANCH='"v4h-raptor\/v5.10.147\/rcar-5.2.0.rc19"'
+KERNEL_BRANCH='"v4h-sbc\/v5.10.147\/rcar-5.2.0.rc19"'
+# A version of kernel 6 from REL
+#KERNEL_BRANCH='"v4h-sbc\/v6.12.29-2025-05-20"'
 KERNEL_RECIPE="meta-rtx/recipes-kernel/linux/linux-renesas_5.10.bbappend"
 KERNEL_URL_REL='"git:\/\/github.com\/RetronixTechInc\/rcar-kernel.git;protocol=https"'
 KERNEL_URL_DEV='"git:\/\/git@github.com\/RetronixTechInc\/rcar-gen4-kernel.git;protocol=ssh"'
@@ -32,16 +34,16 @@ else
 fi
 
 # modify uboot recipe for sdk3p28
-UBOOT_BRANCH='"v4h-raptor\/v2022.01\/rcar-6.0.0.rc9"'
+UBOOT_BRANCH='"v4h-sbc\/v2022.01\/rcar-6.0.0.rc9"'
 UBOOT_RECIPE="meta-rtx/recipes-bsp/u-boot/u-boot_2022.01.bbappend"
 sed "s/RTX_BRANCH = .*/RTX_BRANCH = ${UBOOT_BRANCH}/g" -i ${UBOOT_RECIPE}
 
 case "$1" in
-"all" | "raptor" | "grayhawk" | "whitehawk" | "eagle" | "condor")
+"all" | "raptor" | "v4h-sbc" | "grayhawk" | "whitehawk" | "eagle" | "condor")
     echo "Use build configuration for $1 board"
     ;;
 *)
-    echo "Provide board name. Supported boards: raptor, grayhawk, whitehawk, condor, eagle."
+    echo "Provide board name. Supported boards: raptor, v4h-sbc, grayhawk, whitehawk, condor, eagle."
     exit -1
     ;;
 esac
@@ -95,6 +97,7 @@ fi
 
 if [ $BOARD = "all" ]; then
     build_function raptor $OPTION
+    build_function v4h-sbc $OPTION
     build_function grayhawk $OPTION
     build_function whitehawk $OPTION
     build_function condor $OPTION
