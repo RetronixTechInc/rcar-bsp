@@ -1,11 +1,12 @@
 #  Quick start[Ubuntu 20.04 LTS (64bit only)]
 
-1. Download script
-git clone https://github.com/RetronixTechInc/rcar-bsp.git -b v4h-raptor
+1. Download script  
+git clone https://github.com/RetronixTechInc/rcar-bsp.git -b v4h-raptor  
+git checkout -b bsp-3p28 raptor-bsp-3p28  
 
-2. Using build script(build images of car-image-adas)
-$ cd car-BSP
-$ ./build_yocto_v3p18.sh
+2. Using build script(build images of rcar-image-adas)  
+$ cd rcar-BSP  
+$ ./build_yocto_v3p28.sh  
 
 ----- Build and Download images to PCBA refer to 101_RRC-Raptor-V4H_Porting_Guide.pdf -----
 ##  Build BSP and write to PCBA
